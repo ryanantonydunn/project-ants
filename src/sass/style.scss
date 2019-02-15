@@ -1,0 +1,38 @@
+@charset "UTF-8";
+@import url('https://fonts.googleapis.com/css?family=Orbitron');
+
+$breakpoints:(
+	xs: 400px,
+	sm: 540px,
+	md: 760px,
+	lg: 1000px,
+	xl: 1200px,
+	x2: 1400px,
+);
+
+// min width
+@mixin media-min($bp) {
+  @media screen and (min-width: #{map-get($breakpoints, $bp)}) {
+    @content;
+  }
+}
+
+// max width
+@mixin media-max($bp) {
+  @media screen and (max-width: #{map-get($breakpoints, $bp) - 1}) {
+    @content;
+  }
+}
+
+// between width
+@mixin media-between($bp1, $bp2) {
+  @media screen and (min-width: #{map-get($breakpoints, $bp1)}) and (max-width: #{map-get($breakpoints, $bp2) - 1}) {
+    @content;
+  }
+}
+
+@import "normalize";	
+@import "base"; 
+@import "interface"; 
+@import "menu"; 
+@import "game"; 
