@@ -36,18 +36,19 @@ gulp.task("sprites", function() {
   var sprite = gulp.src(src_sprites).pipe(
     spritesmith({
       imgName: "sprites.png",
-      cssName: "sprites.json",
+      cssName: "sprites.js",
       cssTemplate: function(data) {
-        var str = "{\n";
+        var str = "var config = config || {};\n";
+        str += "config.sprites = {\n";
         data.sprites.forEach(function(sprite, i) {
           var name = sprite.name.toLowerCase();
-          str += "\t" + '"' + name + '"' + ": {\n";
-          str += "\t\t" + '"size": ' + sprite.width + ",\n";
-          str += "\t\t" + '"x": ' + sprite.x + ",\n";
-          str += "\t\t" + '"y": ' + sprite.y + "\n";
-          str += i == data.sprites.length - 1 ? "\t}\n" : "\t},\n";
+          str += "  " + '"' + name + '"' + ": {\n";
+          str += "    " + "size: " + sprite.width + ",\n";
+          str += "    " + "x: " + sprite.x + ",\n";
+          str += "    " + "y: " + sprite.y + "\n";
+          str += i == data.sprites.length - 1 ? "  }\n" : "  },\n";
         });
-        str += "}";
+        str += "};";
         return str;
       }
     })
@@ -60,7 +61,7 @@ gulp.task("sprites", function() {
     .pipe(gulp.dest(assets + "/images/sprites"));
 
   // save json config files
-  var css_stream = sprite.css.pipe(gulp.dest(src + "core/config"));
+  var css_stream = sprite.css.pipe(gulp.dest(src + "/core/config"));
 
   // merge streams
   return merge(img_stream, css_stream).pipe(

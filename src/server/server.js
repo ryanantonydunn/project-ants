@@ -5,6 +5,7 @@ const DOMAIN = process.env.DOMAIN || "http://localhost";
 const PLAYER_LIMIT = process.env.PLAYER_LIMIT || 1;
 const SCHEME = process.env.SCHEME || "deathmatch";
 const DISABLE_ASSET_PORT = String(process.env.DISABLE_ASSET_PORT) === "true";
+const SINGLE = String(process.env.SINGLE) === "true";
 const assetPort = DISABLE_ASSET_PORT ? "" : ":" + PARENT_PORT;
 const ASSETS = DOMAIN + assetPort + "/assets";
 
@@ -19,26 +20,25 @@ var uuid = require("node-uuid");
 // start the room
 const roomInstance = new room();
 
-// message listener
-// process.on("message", message => {
-// // yep
-// });
-
 // check in with parent process
-setInterval(() => {
-  if (room) {
-    process.send({ type: "health" });
-  }
-}, 5000);
+if (!SINGLE) {
+  setInterval(() => {
+    if (room) {
+      process.send({ type: "health" });
+    }
+  }, 5000);
+}
 
 // update parent process with player count
 function sendPlayers() {
-  process.send({ type: "players", count: roomInstance.player_count });
+  if (!SINGLE) {
+    process.send({ type: "players", count: roomInstance.player_count });
+  }
 }
 
 // request handler
 server.listen(PORT);
-app.get("/", function(request, response) {
+app.get("/", (request, response) => {
   response.set("Content-Type", "text/html");
   response.send(`
 <!doctype html>
@@ -56,7 +56,7 @@ app.get("/", function(request, response) {
 <meta property="og:image" content="${ASSETS}/images/fbthumb.jpg">
 <link rel="image_src" href="${ASSETS}/images/fbthumb.jpg">
 <link rel="icon" href="${ASSETS}/images/favicon.png?v=1">
-<link rel="stylesheet" href="${ASSETS}/css/style.css">
+<link rel="stylesheet" type="text/css" href="${ASSETS}/css/style.css">
 </head>
 <body>
 <script src="${DOMAIN + ":" + PORT}/socket.io/socket.io.js"></script>
@@ -65,6 +65,12 @@ app.get("/", function(request, response) {
 </body>
 </html>
 `);
+});
+
+app.get("/*", (request, response) => {
+  const search = request.params[0];
+  const path = __dirname + "/" + search;
+  response.sendFile(path);
 });
 
 // sockets
@@ -85,4 +91,7 @@ io.set("heartbeat timeout", 6000);
 io.set("heartbeat interval", 5000);
 
 // inform parent that we have initialised
-process.send({ type: "init", success: true });
+if (!SINGLE) {
+  process.send({ type: "init", success: true });
+}
+console.log("server instance started", DOMAIN, PORT);

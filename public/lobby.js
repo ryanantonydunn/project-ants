@@ -1,3 +1,7 @@
+const express = require("express");
+const redbird = require("redbird");
+const { fork, exec } = require("child_process");
+
 // env variables
 const PORT = parseInt(process.env.PORT || 3000);
 const PORT_LISTENER = parseInt(process.env.PORT_LISTENER || 15000);
@@ -7,31 +11,27 @@ const PLAYER_LIMIT = process.env.PLAYER_LIMIT || 10;
 const ROOM_LIMIT = process.env.ROOM_LIMIT || 10;
 const DISABLE_ASSET_PORT = process.env.DISABLE_ASSET_PORT;
 
-console.log(PORT);
+console.log(DOMAIN + " | " + PORT + " | " + PORT_LISTENER);
 console.log(PORT_LISTENER);
 console.log(DOMAIN);
 
-// imports
-const proxy = require("redbird")({ port: PORT, bunyan: PROXY_LOGS });
-const app = require("express")();
-const server = require("http").Server(app);
-const { fork, exec } = require("child_process");
+const proxy = redbird({ port: PORT_LISTENER, bunyan: PROXY_LOGS });
+const app = express();
 
-// kill all existing processes
-exec("pkill -f server.js");
-
-// request handler
-server.listen(PORT_LISTENER);
-proxy.register(DOMAIN + ":" + PORT + "/", DOMAIN + ":" + PORT_LISTENER + "/");
+proxy.register(DOMAIN + ":" + PORT, DOMAIN + ":" + PORT_LISTENER);
 app.get("/", (request, response) => {
   request.connection.setTimeout(6000);
   return findRoom(response);
 });
-app.get("/*", function(request, response) {
+app.get("/*", (request, response) => {
   const search = request.params[0];
   const path = __dirname + "/" + search;
   response.sendFile(path);
 });
+app.listen(PORT, () => console.log(`Server listening on ${PORT}!`));
+
+// kill all existing processes
+exec("pkill -f server.js");
 
 // setup rooms
 const rooms = {};
