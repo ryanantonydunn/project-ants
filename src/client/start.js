@@ -25,7 +25,7 @@ app.prototype.init_start = function() {
     type: "ul",
     class: "fade",
     text:
-      "<li>Collect gems to get stronger</li><li>Destroy the enemy to get their gems!</li><li>WASD or Right Click to Move</li><li>Left Click or Shift to Shoot</li>"
+      "<li>Collect gems to get stronger</li><li>Destroy the enemy to get their gems!</li><li>Click to Move</li><li>Alt + Click or Right Click to Shoot</li>"
   });
   this.input_name = element({
     type: "input",

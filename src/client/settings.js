@@ -51,9 +51,9 @@ app.prototype.init_settings = function() {
   // controls
   var ctext = "<h2>Controls</h2>";
   ctext += "<dl>";
-  ctext += "<dt>Move</dt><dd>WASD / Arrow Keys / Right Click</dd>";
+  ctext += "<dt>Move</dt><dd>Left Click</dd>";
   ctext += "<dt>Jump</dt><dd>Spacebar</dd>";
-  ctext += "<dt>Shoot</dt><dd>Left Click / Shift</dd>";
+  ctext += "<dt>Shoot</dt><dd>Right Click / Alt + Left Click</dd>";
   ctext += "<dt>Select Weapon</dt><dd>1-9 / Scroll Wheel</dd>";
   ctext += "<dt>Follow Weapons</dt><dd>F</dd>";
   ctext += "<dt>Free Cam</dt><dd>Middle Click</dd>";
