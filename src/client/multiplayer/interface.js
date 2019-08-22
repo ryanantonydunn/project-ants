@@ -33,7 +33,7 @@ multiplayer.prototype.init_interface = function() {
   this.div_dead = element({ class: "full full_bg" });
   this.div_dead_cont = element({
     class: "cont_center red",
-    text: "<h3>You have died!</h3>" + shareLinksText
+    text: "<h3>You have died!</h3>"
   });
   this.div_dead_text = element({
     type: "p",

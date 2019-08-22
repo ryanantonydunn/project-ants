@@ -851,9 +851,9 @@ config.objects = {
     size: 20,
     weight: 0,
     damage: 16,
-    timeout: 8,
+    timeout: 26,
     player_lock: true,
-    stop: 6,
+    stop: 24,
     events: {
       ground: "slide"
     },
@@ -1109,7 +1109,7 @@ config.sprites = {
     x: 384,
     y: 1056
   },
-  "bat": {
+  bat: {
     size: 48,
     x: 432,
     y: 1056
@@ -1154,7 +1154,7 @@ config.sprites = {
     x: 816,
     y: 1056
   },
-  "pumpkin": {
+  pumpkin: {
     size: 48,
     x: 864,
     y: 1056
@@ -1534,7 +1534,7 @@ config.sprites = {
     x: 672,
     y: 1120
   },
-  "crosshair": {
+  crosshair: {
     size: 48,
     x: 720,
     y: 1120
@@ -1679,7 +1679,7 @@ config.sprites = {
     x: 768,
     y: 576
   },
-  "extinguisher": {
+  extinguisher: {
     size: 48,
     x: 768,
     y: 1120
@@ -1874,22 +1874,22 @@ config.sprites = {
     x: 1168,
     y: 768
   },
-  "nuclear": {
+  nuclear: {
     size: 96,
     x: 960,
     y: 384
   },
-  "rocket": {
+  rocket: {
     size: 48,
     x: 1168,
     y: 816
   },
-  "smoke": {
+  smoke: {
     size: 24,
     x: 600,
     y: 1024
   },
-  "target": {
+  target: {
     size: 48,
     x: 48,
     y: 1168
@@ -1985,6 +1985,7 @@ config.sprites = {
     y: 960
   }
 };
+
 var config = config || {};
 config.weapons = {
   default: {
@@ -2056,9 +2057,9 @@ config.weapons = {
     sprite: "punch",
     fire_audio: "throw",
     fire_body_sprite: "superman",
-    speed: 14,
+    speed: 24,
     object: "punch",
-    cooldown: 30,
+    cooldown: 120,
     recoil: 0,
     inertia: 0.5
   },
@@ -4948,7 +4949,7 @@ mapgen.prototype.circle = function(min_radius, max_radius) {
 var schemes = schemes || {};
 schemes.deathmatch = {
   title: "Deathmatch",
-  time_limit: 5800,
+  time_limit: 0,
   destroy_land: true,
   gravity: 2,
   score: true,
@@ -5002,12 +5003,12 @@ schemes.deathmatch = {
       crate_count: -1
     },
     pumpkin: {
-      start_count: 0,
+      start_count: 5,
       crate_chance: 1,
       crate_count: 5
     },
     paingiver: {
-      start_count: 0,
+      start_count: 20,
       crate_chance: 1,
       crate_count: 5
     }
@@ -6798,15 +6799,14 @@ app.get("/", (request, response) => {
 <!doctype html>
 <html>
 <head>
-<title>Project Ants</title>
 <meta name="viewport" content="minimal-ui, user-scalable=no, initial-scale=0.7, maximum-scale=0.7, width=device-width">
-<meta name="description" content="The browser game where angry ants blow each other up in space!">
-<meta property="og:description" content="The browser game where angry ants blow each other up in space!">
+<meta name="description" content="Hand made browser action game">
+<meta property="og:description" content="Hand made browser action game">
 <meta name="keywords" content="projectants, ants, game, games, web game, html5, fun, flash">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Project Ants">
-<meta property="og:url" content="http://projectants.com/">
-<meta property="og:site_name" content="http://projectants.com/">
+<meta property="og:url" content="http://ryanantonydunn.github.io/project-ants/">
+<meta property="og:site_name" content="http://ryanantonydunn.github.io/project-ants/">
 <meta property="og:image" content="${ASSETS}/images/fbthumb.jpg">
 <link rel="image_src" href="${ASSETS}/images/fbthumb.jpg">
 <link rel="icon" href="${ASSETS}/images/favicon.png?v=1">

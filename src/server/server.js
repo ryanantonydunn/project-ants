@@ -44,15 +44,14 @@ app.get("/", (request, response) => {
 <!doctype html>
 <html>
 <head>
-<title>Project Ants</title>
 <meta name="viewport" content="minimal-ui, user-scalable=no, initial-scale=0.7, maximum-scale=0.7, width=device-width">
-<meta name="description" content="The browser game where angry ants blow each other up in space!">
-<meta property="og:description" content="The browser game where angry ants blow each other up in space!">
+<meta name="description" content="Hand made browser action game">
+<meta property="og:description" content="Hand made browser action game">
 <meta name="keywords" content="projectants, ants, game, games, web game, html5, fun, flash">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Project Ants">
-<meta property="og:url" content="http://projectants.com/">
-<meta property="og:site_name" content="http://projectants.com/">
+<meta property="og:url" content="http://ryanantonydunn.github.io/project-ants/">
+<meta property="og:site_name" content="http://ryanantonydunn.github.io/project-ants/">
 <meta property="og:image" content="${ASSETS}/images/fbthumb.jpg">
 <link rel="image_src" href="${ASSETS}/images/fbthumb.jpg">
 <link rel="icon" href="${ASSETS}/images/favicon.png?v=1">

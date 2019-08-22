@@ -7,6 +7,9 @@ function SocketConnection(callback) {
   var self = this;
 
   // socket connection
+  if (!io.on) {
+    return;
+  }
   this.io = io(DOMAIN + ":" + PORT);
   this.io.on("message", function(message) {
     self.message_receive(message);

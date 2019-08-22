@@ -147,7 +147,7 @@ game.prototype.get_input = function() {
   }
 
   // set the onboarding
-  this.onboarding.set(response.action);
+  this.onboarding && this.onboarding.set(response.action);
 
   return response;
 };

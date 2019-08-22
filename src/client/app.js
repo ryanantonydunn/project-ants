@@ -2,13 +2,6 @@
     App
  ========================================================================== */
 
-const shareLinksText =
-  "<div class='links'><a target='_blank' class='fb ball' href='https://www.facebook.com/sharer/sharer.php?u=http://projectants.com' title='Share on Facebook'><img src='" +
-  ASSETS +
-  "/images/facebook.png' alt=''></a><a target='_blank' class='twitter ball' href='https://twitter.com/intent/tweet?status=Come%20and%20play%20http%3A%2F%2Fprojectants.com%20%23projectants' title='Share on Twitter'><img src='" +
-  ASSETS +
-  "/images/twitter.png' alt=''></a><br/><a target='_blank' href='mailto:projectantsgame@gmail.com'>Contact</a> | <a target='_blank' href='https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=projectantsgame@gmail.com&lc=UK&item_name=Keeping+the+ants+at+bay!&no_note=0&no_shipping=2&curency_code=GBP&bn=PP-DonationsBF:btn_donateCC_LG.gif:NonHosted'>Donate</a></div>";
-
 const url = new URL(window.location);
 const watch = !!url.searchParams.get("watch");
 
@@ -32,7 +25,7 @@ function app() {
 
   this.init_settings();
 
-  if (this.watch) {
+  if (this.watch || singlePlayer) {
     this.load_room();
   } else {
     this.init_start();
@@ -100,25 +93,34 @@ app.prototype.init_room = function(assets) {
   this.assets = assets;
   this.audio.add_buffers(assets.audio);
 
-  this.room = new multiplayer(
-    this.assets,
-    this.assets_url,
-    this.audio,
-    this.input,
-    this.nickname,
-    this.watch,
-    this.run_event,
-    this.sockets,
-    new onboarding()
-  );
-  append(this.div, this.room.div);
-
-  if (this.watch) {
-    this.sockets.message_send("watcher", []);
+  if (singlePlayer) {
+    this.room = new demo(
+      this.assets,
+      this.assets_url,
+      this.audio,
+      this.input,
+      "Demo name"
+    );
   } else {
-    this.nickname = this.check_name(this.nickname);
-    this.sockets.message_send("send_name", [this.nickname]);
+    this.room = new multiplayer(
+      this.assets,
+      this.assets_url,
+      this.audio,
+      this.input,
+      this.nickname,
+      this.watch,
+      this.run_event,
+      this.sockets,
+      new onboarding()
+    );
+    if (this.watch) {
+      this.sockets.message_send("watcher", []);
+    } else {
+      this.nickname = this.check_name(this.nickname);
+      this.sockets.message_send("send_name", [this.nickname]);
+    }
   }
+  append(this.div, this.room.div);
 };
 
 window.onload = function() {

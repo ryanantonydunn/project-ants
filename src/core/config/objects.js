@@ -366,9 +366,9 @@ config.objects = {
     size: 20,
     weight: 0,
     damage: 16,
-    timeout: 8,
+    timeout: 26,
     player_lock: true,
-    stop: 6,
+    stop: 24,
     events: {
       ground: "slide"
     },

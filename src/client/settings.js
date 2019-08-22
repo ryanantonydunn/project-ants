@@ -27,7 +27,7 @@ app.prototype.init_settings = function() {
   this.div_settings = element({ class: "full full_bg" });
   this.div_settings_cont = element({
     class: "cont_center div_controls",
-    text: "<div class='top_message'>Settings</div>" + shareLinksText
+    text: "<div class='top_message'>Settings</div>"
   });
   append(this.div, this.div_settings);
   append(this.div_settings, this.div_settings_cont);

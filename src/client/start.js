@@ -44,7 +44,6 @@ app.prototype.init_start = function() {
   append(this.start, instructions);
   append(this.start, this.input_name);
   append(this.start, this.button_start);
-  append(this.start, element({ text: shareLinksText }));
 
   // start up the app
   this.button_start.onclick = function() {

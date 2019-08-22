@@ -1,7 +1,7 @@
 var schemes = schemes || {};
 schemes.deathmatch = {
   title: "Deathmatch",
-  time_limit: 5800,
+  time_limit: 0,
   destroy_land: true,
   gravity: 2,
   score: true,
@@ -55,12 +55,12 @@ schemes.deathmatch = {
       crate_count: -1
     },
     pumpkin: {
-      start_count: 0,
+      start_count: 5,
       crate_chance: 1,
       crate_count: 5
     },
     paingiver: {
-      start_count: 0,
+      start_count: 20,
       crate_chance: 1,
       crate_count: 5
     }

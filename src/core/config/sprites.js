@@ -25,7 +25,7 @@ config.sprites = {
     x: 384,
     y: 1056
   },
-  "bat": {
+  bat: {
     size: 48,
     x: 432,
     y: 1056
@@ -70,7 +70,7 @@ config.sprites = {
     x: 816,
     y: 1056
   },
-  "pumpkin": {
+  pumpkin: {
     size: 48,
     x: 864,
     y: 1056
@@ -450,7 +450,7 @@ config.sprites = {
     x: 672,
     y: 1120
   },
-  "crosshair": {
+  crosshair: {
     size: 48,
     x: 720,
     y: 1120
@@ -595,7 +595,7 @@ config.sprites = {
     x: 768,
     y: 576
   },
-  "extinguisher": {
+  extinguisher: {
     size: 48,
     x: 768,
     y: 1120
@@ -790,22 +790,22 @@ config.sprites = {
     x: 1168,
     y: 768
   },
-  "nuclear": {
+  nuclear: {
     size: 96,
     x: 960,
     y: 384
   },
-  "rocket": {
+  rocket: {
     size: 48,
     x: 1168,
     y: 816
   },
-  "smoke": {
+  smoke: {
     size: 24,
     x: 600,
     y: 1024
   },
-  "target": {
+  target: {
     size: 48,
     x: 48,
     y: 1168

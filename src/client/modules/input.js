@@ -65,18 +65,19 @@ function input(callback) {
   };
 
   // mouse wheel
-  if ("onmousewheel" in document.body) {
-    document.body.onmousewheel = function(e) {
-      e.preventDefault ? e.preventDefault() : (e.returnValue = false);
-      e = e || window.event;
-      self.scroll_wheel(e);
-      return false;
-    };
-  } else {
-    document.body.addEventListener("DOMMouseScroll", function(e) {
-      self.scroll_wheel(e);
-    });
-  }
+  // if ("onmousewheel" in document.body) {
+  //   document.body.onmousewheel = function(e) {
+  //     e.preventDefault && e.preventDefault();
+  //     e.returnValue = false;
+  //     e = e || window.event;
+  //     self.scroll_wheel(e);
+  //     return false;
+  //   };
+  // } else {
+  //   document.body.addEventListener("DOMMouseScroll", function(e) {
+  //     self.scroll_wheel(e);
+  //   });
+  // }
 
   // manage keyboard events
   document.body.onkeydown = function(e) {

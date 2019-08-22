@@ -69,9 +69,9 @@ config.weapons = {
     sprite: "punch",
     fire_audio: "throw",
     fire_body_sprite: "superman",
-    speed: 14,
+    speed: 24,
     object: "punch",
-    cooldown: 30,
+    cooldown: 120,
     recoil: 0,
     inertia: 0.5
   },
