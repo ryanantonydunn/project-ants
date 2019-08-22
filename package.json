@@ -10,7 +10,9 @@
     "server:single": "PORT=3000 SINGLE=true node public/server.js",
     "server:single:dev": "DOMAIN=http://localhost npm run server:single",
     "server:single:production": "DOMAIN=http://projectants.com DISABLE_ASSET_PORT=true npm run server:single",
-    "build:production": "gulp build --production",
+    "build": "gulp build --production",
+    "predeploy": "npm run build && mkdir -p ./docs && rm -f -r ./docs/* && cp -a ./public/. ./docs/",
+    "deploy": "gh-pages -d build",
     "test": "",
     "start": ""
   },
@@ -24,7 +26,7 @@
     "socket.io-proxy": "^1.0.3"
   },
   "devDependencies": {
-    "http-server": "0.11.1",
+    "gh-pages": "^2.1.1",
     "gulp": "3.9.1",
     "gulp-autoprefixer": "^3.1.1",
     "gulp-cli": "^2.2.0",
@@ -39,6 +41,7 @@
     "gulp-string-replace": "^1.1.1",
     "gulp-util": "^3.0.8",
     "gulp.spritesmith": "^6.9.0",
+    "http-server": "0.11.1",
     "merge-stream": "^1.0.1",
     "vinyl-buffer": "^1.0.1"
   }

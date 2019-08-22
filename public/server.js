@@ -2097,6 +2097,620 @@ for (key in config.weapons) {
 }
 
 /* ========================================================================
+	Map Generator
+	Blobs
+ ========================================================================== */
+
+/* Draw a blob
+	---------------------------------------- */
+
+function mapgen_blob(img, config, decorations, radius, type) {
+  this.size = 36;
+  this.img = img;
+  this.c = config;
+
+  // get land type
+  var type = type || Math.floor(Math.random() * this.c.land_type.length);
+  this.ref = this.c.land_type[type];
+
+  // set up main anchor points
+  var anchors = [];
+  var points = Math.floor(radius / 2) + 4;
+  var spike = Math.floor(radius / 2) + 2;
+  for (var p = 0; p < points; p++) {
+    var new_radius =
+      Math.max(radius - Math.floor(Math.random() * spike), 1) + 1;
+    var x =
+      radius + Math.floor(new_radius * Math.cos((2 * Math.PI * p) / points));
+    var y =
+      radius + Math.floor(new_radius * Math.sin((2 * Math.PI * p) / points));
+    anchors.push({ x: x, y: y });
+  }
+
+  // draw shape to canvas
+  var size = radius * 2 + 1;
+  var shape = mapgen_canvas(size, size);
+  this.draw_path(shape, anchors);
+
+  // build array of land or not tiles
+  var pixels = shape.cont.getImageData(0, 0, shape.w, shape.h);
+  this.land = [];
+  for (var y = 0; y < size; y++) {
+    this.land[y] = [];
+    for (var x = 0; x < size; x++) {
+      var i = (y * size + x) * 4 + 3;
+      this.land[y][x] = pixels.data[i] > 30 ? 1 : 0;
+    }
+  }
+
+  // build tile array and assign corners and land
+  this.tiles = [];
+  for (var y = 0; y < size; y++) {
+    this.tiles[y] = [];
+    for (var x = 0; x < size; x++) {
+      this.tiles[y][x] = this.set_corner_tile(y, x);
+    }
+  }
+
+  // assign pixels a tile value
+  for (var y = 0; y < size; y++) {
+    for (var x = 0; x < size; x++) {
+      this.tiles[y][x] =
+        this.tiles[y][x] === 12 ? this.set_land_tile(y, x) : this.tiles[y][x];
+    }
+  }
+
+  // draw them
+  var wh = (size + 4) * this.size;
+  this.alpha = mapgen_canvas(wh, wh);
+  this.edge = mapgen_canvas(wh, wh);
+  this.bg = mapgen_canvas(wh, wh);
+  for (var y = 0; y < size; y++) {
+    for (var x = 0; x < size; x++) {
+      var tile = this.tiles[y][x];
+      if (tile === -1) {
+        continue;
+      }
+
+      // draw it
+      var x1 = (x + 2) * this.size;
+      var y1 = (y + 2) * this.size;
+      this.draw_to_canvas(this.alpha.cont, x1, y1, tile, 0);
+      this.draw_to_canvas(this.edge.cont, x1, y1, tile, this.ref.edge);
+
+      if (decorations) {
+        this.draw_decoration(this.bg.cont, x, y, tile);
+      }
+    }
+  }
+
+  // draw rest of fg
+  var fg = mapgen_pattern(this.alpha.canv, this.img[this.ref.fg]);
+  fg.cont.drawImage(this.edge.canv, 0, 0);
+
+  // draw dirt bg
+  var fg_dirt = mapgen_pattern(fg.canv, this.img[this.ref.bg]);
+  this.bg.cont.drawImage(fg_dirt.canv, 0, 0);
+
+  // export
+  return {
+    fg: fg,
+    bg: this.bg
+  };
+}
+
+/* Draw an alpha path
+	---------------------------------------- */
+
+mapgen_blob.prototype.draw_path = function(canv, path) {
+  // start paths on canvases
+  canv.cont.beginPath();
+  canv.cont.moveTo(path[0].x, path[0].y);
+
+  // go through path
+  for (var i = 1; i < path.length - 1; i++) {
+    // get next point to curve around
+    var point1 = path[i],
+      point2 = path[i + 1],
+      qx,
+      qy;
+
+    // get curve values
+    if (i < path.length - 1) {
+      qx = (point1.x + point2.x) / 2;
+      qy = (point1.y + point2.y) / 2;
+    } else {
+      qx = point2.x;
+      qy = point2.y;
+    }
+
+    // draw curve to path
+    canv.cont.quadraticCurveTo(point1.x, point1.y, qx, qy);
+  }
+
+  // rejoin the beginning of the path and fill
+  canv.cont.lineTo(path[0].x, path[0].y);
+  canv.cont.fill();
+};
+
+/* Draw a decoration
+	---------------------------------------- */
+
+mapgen_blob.prototype.draw_decoration = function(cont, x, y, tile) {
+  // are we drawing one
+  if (tile > 7 || Math.floor(Math.random() * 2) !== 0) {
+    return;
+  }
+
+  // can we do doubles
+  var double = false;
+  if (tile === 0 && this.is_type(y, x + 1, 0)) {
+    double = true;
+  }
+  if (tile === 1 && this.is_type(y, x - 1, 1)) {
+    double = true;
+  }
+  if (tile === 2 && this.is_type(y - 1, x, 2)) {
+    double = true;
+  }
+  if (tile === 3 && this.is_type(y + 1, x, 3)) {
+    double = true;
+  }
+  if (tile === 4 && this.is_type(y - 1, x + 1, 4)) {
+    double = true;
+  }
+  if (tile === 5 && this.is_type(y + 1, x + 1, 5)) {
+    double = true;
+  }
+  if (tile === 6 && this.is_type(y - 1, x - 1, 6)) {
+    double = true;
+  }
+  if (tile === 7 && this.is_type(y + 1, x - 1, 7)) {
+    double = true;
+  }
+
+  // choose source
+  var source = this.ref.decorations[1];
+  if (double && Math.floor(Math.random() * 2) === 0) {
+    source = this.ref.decorations[2];
+  } else {
+    double = false;
+  }
+
+  // choose decoration
+  var i = Math.floor(Math.random() * source.length);
+  var ref = source[i];
+
+  // get position to draw it
+  var half = this.size / 2;
+  var x1 = (x + 2) * this.size;
+  var y1 = (y + 2) * this.size;
+  var angle = 0;
+  if (tile === 1) {
+    x1 += this.size;
+    y1 += this.size;
+    angle = 180;
+  }
+  if (tile === 2) {
+    y1 += this.size;
+    angle = 270;
+  }
+  if (tile === 3) {
+    x1 += this.size;
+    angle = 90;
+  }
+  if (tile === 4) {
+    y1 += this.size;
+    angle = 315;
+  }
+  if (tile === 5) {
+    angle = 45;
+  }
+  if (tile === 6) {
+    x1 += this.size;
+    y1 += this.size;
+    angle = 225;
+  }
+  if (tile === 7) {
+    x1 += this.size;
+    angle = 135;
+  }
+
+  // draw that shit
+  var x_add = double ? this.size : 0;
+  cont.save();
+  cont.translate(x1, y1);
+  cont.rotate((angle * Math.PI) / 180);
+  cont.drawImage(
+    this.img.decorations,
+    ref.x,
+    ref.y,
+    ref.w,
+    ref.h,
+    0,
+    -ref.h + 5,
+    ref.w,
+    ref.h
+  );
+  cont.translate(-x1, -y1);
+  cont.restore();
+};
+
+/* Draw a tile to a canvas
+	---------------------------------------- */
+
+mapgen_blob.prototype.draw_to_canvas = function(cont, x, y, tile, key) {
+  var ts = this.size;
+  cont.save();
+  cont.translate(x, y);
+  cont.drawImage(this.img.edge, tile * ts, key * ts, ts, ts, 0, 0, ts, ts);
+  cont.translate(-y, -y);
+  cont.restore();
+};
+
+/* Get corner and land tiles
+	---------------------------------------- */
+
+mapgen_blob.prototype.set_corner_tile = function(y, x) {
+  var tile = -1;
+
+  //land
+  if (this.is_land(y, x)) {
+    tile = 12;
+
+    // not land
+  } else {
+    // corners
+    if (
+      !this.is_land(y - 1, x) &&
+      !this.is_land(y, x - 1) &&
+      this.is_land(y + 1, x) &&
+      this.is_land(y, x + 1)
+    ) {
+      tile = 4;
+    } else if (
+      !this.is_land(y - 1, x) &&
+      this.is_land(y, x - 1) &&
+      this.is_land(y + 1, x) &&
+      !this.is_land(y, x + 1)
+    ) {
+      tile = 5;
+    } else if (
+      this.is_land(y - 1, x) &&
+      !this.is_land(y, x - 1) &&
+      !this.is_land(y + 1, x) &&
+      this.is_land(y, x + 1)
+    ) {
+      tile = 6;
+    } else if (
+      this.is_land(y - 1, x) &&
+      this.is_land(y, x - 1) &&
+      !this.is_land(y + 1, x) &&
+      !this.is_land(y, x + 1)
+    ) {
+      tile = 7;
+    }
+  }
+
+  return tile;
+};
+
+/* Set land tile types
+	---------------------------------------- */
+
+mapgen_blob.prototype.set_land_tile = function(y, x) {
+  var tile = 12;
+
+  // corners
+  if (
+    !this.is_land(y - 1, x) &&
+    !this.is_land(y, x - 1) &&
+    this.is_land_or_corner(y + 1, x) &&
+    this.is_land_or_corner(y, x + 1) &&
+    !this.is_corner(y, x - 1) &&
+    !this.is_corner(y - 1, x)
+  ) {
+    tile = 4;
+  } else if (
+    !this.is_land(y - 1, x) &&
+    !this.is_land(y, x + 1) &&
+    this.is_land_or_corner(y, x - 1) &&
+    this.is_land_or_corner(y + 1, x) &&
+    !this.is_corner(y, x + 1) &&
+    !this.is_corner(y - 1, x)
+  ) {
+    tile = 5;
+  } else if (
+    !this.is_land(y, x - 1) &&
+    !this.is_land(y + 1, x) &&
+    this.is_land_or_corner(y - 1, x) &&
+    this.is_land_or_corner(y, x + 1) &&
+    !this.is_corner(y, x - 1) &&
+    !this.is_corner(y + 1, x)
+  ) {
+    tile = 6;
+  } else if (
+    !this.is_land(y + 1, x) &&
+    !this.is_land(y, x + 1) &&
+    this.is_land_or_corner(y - 1, x) &&
+    this.is_land_or_corner(y, x - 1) &&
+    !this.is_corner(y, x + 1) &&
+    !this.is_corner(y + 1, x)
+  ) {
+    tile = 7;
+
+    // flat edges
+  } else if (
+    !this.is_land(y - 1, x) &&
+    this.is_land(y + 1, x) &&
+    !this.is_corner(y - 1, x)
+  ) {
+    tile = 0;
+  } else if (
+    !this.is_land(y + 1, x) &&
+    this.is_land(y - 1, x) &&
+    !this.is_corner(y + 1, x)
+  ) {
+    tile = 1;
+  } else if (
+    !this.is_land(y, x - 1) &&
+    this.is_land(y, x + 1) &&
+    !this.is_corner(y, x - 1)
+  ) {
+    tile = 2;
+  } else if (
+    !this.is_land(y, x + 1) &&
+    this.is_land(y, x - 1) &&
+    !this.is_corner(y, x + 1)
+  ) {
+    tile = 3;
+
+    // inside corners
+  } else if (this.is_type(y + 1, x, 7) || this.is_type(y, x + 1, 7)) {
+    tile = 8;
+  } else if (this.is_type(y + 1, x, 6) || this.is_type(y, x - 1, 6)) {
+    tile = 9;
+  } else if (this.is_type(y - 1, x, 5) || this.is_type(y, x + 1, 5)) {
+    tile = 10;
+  } else if (this.is_type(y - 1, x, 4) || this.is_type(y, x - 1, 4)) {
+    tile = 11;
+  }
+
+  return tile;
+};
+
+/* Check arrays for values
+	---------------------------------------- */
+
+mapgen_blob.prototype.is_land_or_corner = function(y, x) {
+  if (this.is_corner(y, x) || this.is_land(y, x)) {
+    return true;
+  }
+};
+
+mapgen_blob.prototype.is_corner = function(y, x) {
+  return this.check_arr(this.tiles, y, x, [4, 5, 6, 7]);
+};
+
+mapgen_blob.prototype.is_type = function(y, x, type) {
+  return this.check_arr(this.tiles, y, x, [type]);
+};
+
+mapgen_blob.prototype.is_land = function(y, x) {
+  return this.check_arr(this.land, y, x, [1]);
+};
+
+mapgen_blob.prototype.check_arr = function(arr, y, x, checks) {
+  if (y < 0 || y >= arr.length || x < 0 || x >= arr[0].length) {
+    return false;
+  }
+  for (var i = 0; i < checks.length; i++) {
+    if (arr[y][x] == checks[i]) {
+      return true;
+    }
+  }
+};
+
+/* ========================================================================
+	Map Generator
+	Make Canvas
+ ========================================================================== */
+
+/* Set up a new canvas
+	---------------------------------------- */
+
+function mapgen_canvas(w, h) {
+  var obj = {};
+  if ("undefined" != typeof global) {
+    obj.canv = new canvas();
+  } else {
+    obj.canv = document.createElement("canvas");
+  }
+  obj.cont = obj.canv.getContext("2d");
+  obj.canv.width = w;
+  obj.canv.height = h;
+  obj.cont.fillStyle = "#fff";
+  obj.w = w;
+  obj.h = h;
+  return obj;
+}
+
+/* Draw a pattern to a canvas
+	---------------------------------------- */
+
+function mapgen_pattern(alpha, pattern) {
+  var canv = mapgen_canvas(alpha.width, alpha.height);
+  if (typeof pattern !== "string") {
+    pattern = canv.cont.createPattern(pattern, "repeat");
+  }
+  canv.cont.fillStyle = pattern;
+  canv.cont.fillRect(0, 0, alpha.width, alpha.height);
+  canv.cont.globalCompositeOperation = "destination-in";
+  canv.cont.drawImage(alpha, 0, 0);
+  canv.cont.globalCompositeOperation = "normal";
+
+  return canv;
+}
+
+/* ========================================================================
+	Map Generator
+	------------
+	Config:
+	w           // width of map
+	h           // height of map
+	crust       // thickness of outer crust on land
+	blobs       // initial blobs
+	center_blob // size of center blob of land, 0 for none
+	small_blobs // number of random small circles of land
+	large_blobs // number of random large circles of land
+	-----------
+ ========================================================================== */
+
+/* Server side only
+	---------------------------------------- */
+
+if ("undefined" != typeof global) {
+  var fs = require("fs");
+}
+
+/* New Map Generation
+	---------------------------------------- */
+
+function mapgen(img, config, scheme, map_img) {
+  this.size = 36;
+  this.img = img;
+  this.c = config;
+  this.scheme = scheme;
+
+  // choose type
+  if (this.scheme.type == "random") {
+    return this.draw_random();
+  }
+  if (this.scheme.type == "image") {
+    return this.draw_image(map_img);
+  }
+}
+
+/* Draw image
+	---------------------------------------- */
+
+mapgen.prototype.draw_image = function(map_img) {
+  var fg = mapgen_canvas(
+    map_img.width + this.scheme.gap * 2,
+    map_img.height + this.scheme.gap * 2
+  );
+  fg.cont.drawImage(map_img, this.scheme.gap, this.scheme.gap);
+  var bg = mapgen_pattern(fg.canv, this.img.dirt);
+  return { fg: fg, bg: bg };
+};
+
+/* Draw random
+	---------------------------------------- */
+
+mapgen.prototype.draw_random = function() {
+  // setup
+  this.blobs = JSON.parse(JSON.stringify(this.scheme.blobs));
+  this.bg = mapgen_canvas(this.scheme.w, this.scheme.h);
+  this.fg = mapgen_canvas(this.scheme.w, this.scheme.h);
+
+  // generate some random large circles
+  for (var i = 0; i < this.scheme.large_blobs; i++) {
+    this.blobs = this.get_circle(this.blobs, 4, 6);
+  }
+
+  // generate some random small circles
+  for (var i = 0; i < this.scheme.small_blobs; i++) {
+    this.blobs = this.get_circle(this.blobs, 1, 3);
+  }
+
+  // go through each blob
+  for (var i = 0; i < this.blobs.length; i++) {
+    var blob = this.blobs[i];
+
+    // create the blobs
+    var bg = new mapgen_blob(this.img, this.c, false, blob.r + 4, blob.type);
+    var fg = new mapgen_blob(
+      this.img,
+      this.c,
+      this.scheme.decorations,
+      blob.r,
+      blob.type
+    );
+
+    // combine the backgrounds
+    var wh = fg.fg.canv.width;
+    var new_bg = mapgen_canvas(wh, wh);
+    new_bg.cont.drawImage(bg.fg.canv, wh * 0.1, wh * 0.1, wh * 0.8, wh * 0.8);
+    new_bg.cont.globalCompositeOperation = "source-atop";
+    new_bg.cont.fillStyle = "rgba(0,0,0,0.8)";
+    new_bg.cont.fillRect(0, 0, wh, wh);
+    new_bg.cont.globalCompositeOperation = "normal";
+    new_bg.cont.drawImage(fg.bg.canv, 0, 0);
+
+    // draw it to main canvas
+    this.bg.cont.drawImage(new_bg.canv, blob.x - wh / 2, blob.y - wh / 2);
+    this.fg.cont.drawImage(fg.fg.canv, blob.x - wh / 2, blob.y - wh / 2);
+  }
+
+  // return it
+  return {
+    bg: this.bg,
+    fg: this.fg
+  };
+};
+
+/* Get a far away circle
+	---------------------------------------- */
+
+mapgen.prototype.get_circle = function(arr, min_radius, max_radius) {
+  // generate many circles and find furthest away
+  var distance = 0;
+  var circle = null;
+
+  for (var i = 0; i < 20; i++) {
+    // make new circle
+    var test_circle = this.circle(min_radius, max_radius);
+    var smallest_distance = 999999;
+
+    // find shortest distance from all other circles
+    for (var j = 0; j < arr.length; j++) {
+      var dx = arr[j].x - test_circle.x;
+      var dy = arr[j].y - test_circle.y;
+      var test_distance = Math.round(
+        Math.sqrt(Math.pow(dx, 2) + Math.pow(dy, 2))
+      );
+      smallest_distance =
+        test_distance < smallest_distance ? test_distance : smallest_distance;
+    }
+
+    // if is the largest distance record this as furthest
+    if (distance < smallest_distance) {
+      distance = smallest_distance;
+      circle = test_circle;
+    }
+  }
+
+  // add furthest away circle to new array
+  arr.push(circle);
+  return arr;
+};
+
+/* Generate a random circle
+	---------------------------------------- */
+
+mapgen.prototype.circle = function(min_radius, max_radius) {
+  var r = Math.floor(Math.random() * max_radius) + min_radius;
+  var gap = (r + 2) * this.size + this.scheme.gap;
+  var x = Math.floor(Math.random() * (this.scheme.w - gap * 2)) + gap;
+  var y = Math.floor(Math.random() * (this.scheme.h - gap * 2)) + gap;
+  return {
+    r: r,
+    x: x,
+    y: y
+  };
+};
+
+/* ========================================================================
     Actions
  ========================================================================== */
 
@@ -3869,6 +4483,323 @@ core.prototype.unpack_explosion = function(state, str) {
   this.create_explosion(props, state);
 };
 
+var schemes = schemes || {};
+schemes.deathmatch = {
+  title: "Deathmatch",
+  time_limit: 0,
+  destroy_land: true,
+  gravity: 2,
+  score: true,
+  drops: {
+    crate: {
+      time: 100,
+      max: 1
+    },
+    medpack: {
+      time: 100,
+      add: 30,
+      max: 1
+    },
+    "gem-1": {
+      time: 100,
+      max: 5
+    },
+    "gem-5": {
+      time: 150,
+      max: 1
+    },
+    "gem-20": {
+      time: 500,
+      max: 1
+    }
+  },
+  weapons: {
+    dig: {
+      start_count: -1,
+      crate_chance: 0,
+      crate_count: -1
+    },
+    phaser: {
+      start_count: -1,
+      crate_chance: 0,
+      crate_count: -1
+    },
+    bazookoid: {
+      start_count: -1,
+      crate_chance: 0,
+      crate_count: -1
+    },
+    grenade: {
+      start_count: -1,
+      crate_chance: 0,
+      crate_count: -1
+    },
+    punch: {
+      start_count: -1,
+      crate_chance: 0,
+      crate_count: -1
+    },
+    pumpkin: {
+      start_count: 5,
+      crate_chance: 1,
+      crate_count: 5
+    },
+    paingiver: {
+      start_count: 20,
+      crate_chance: 1,
+      crate_count: 5
+    }
+  },
+  mapgen: {
+    type: "random",
+    src: "",
+    gap: 20,
+    w: 1900,
+    h: 1400,
+    blobs: [],
+    decorations: true,
+    small_blobs: 5,
+    large_blobs: 3
+  },
+  events: {
+    frame: {},
+    collect: {},
+    destroy: {},
+    timeout: {},
+    destroy_obj_type: {},
+    destroy_obj_player: {}
+  }
+};
+
+var schemes = schemes || {};
+schemes.default = {
+  title: "",
+  description: "",
+  time_limit: 0,
+  show_time: true,
+  destroy_land: true,
+  gravity_type: "land",
+  gravity: 1,
+  stars: {},
+  score: false,
+  health: true,
+  levels: {
+    score: [
+      0,
+      10,
+      25,
+      40,
+      60,
+      90,
+      120,
+      150,
+      200,
+      250,
+      300,
+      360,
+      420,
+      490,
+      570,
+      650,
+      720,
+      810,
+      900,
+      1000
+    ],
+    health: [
+      100,
+      120,
+      120,
+      120,
+      140,
+      140,
+      140,
+      140,
+      160,
+      180,
+      200,
+      200,
+      200,
+      200,
+      220,
+      220,
+      220,
+      220,
+      240,
+      300
+    ],
+    damage: [
+      0,
+      10,
+      10,
+      15,
+      15,
+      15,
+      15,
+      20,
+      20,
+      25,
+      25,
+      25,
+      30,
+      30,
+      30,
+      30,
+      35,
+      35,
+      35,
+      50
+    ],
+    speed: [
+      4,
+      6,
+      8,
+      8,
+      8,
+      8,
+      10,
+      10,
+      10,
+      12,
+      12,
+      12,
+      12,
+      14,
+      14,
+      14,
+      14,
+      16,
+      16,
+      20
+    ],
+    jump: [
+      10,
+      12,
+      12,
+      12,
+      12,
+      15,
+      15,
+      15,
+      15,
+      18,
+      18,
+      20,
+      20,
+      20,
+      20,
+      20,
+      20,
+      20,
+      20,
+      25
+    ]
+  },
+  drops: {
+    crate: {
+      time: 0,
+      max: 20
+    },
+    medpack: {
+      time: 0,
+      add: 30,
+      max: 50
+    },
+    nuclear: {
+      time: 0,
+      max: 20
+    },
+    target: {
+      time: 0,
+      max: 100
+    },
+    asteroid_center: {
+      time: 0,
+      increase_frequency: false,
+      max: 30
+    },
+    "gem-1": {
+      time: 0,
+      max: 20
+    }
+  },
+  weapons: {
+    dig: {
+      start_count: -1,
+      crate_chance: 0,
+      crate_count: -1
+    },
+    phaser: {
+      start_count: 0,
+      crate_chance: 0,
+      crate_count: -1
+    },
+    bazookoid: {
+      start_count: 0,
+      crate_chance: 0,
+      crate_count: -1
+    },
+    grenade: {
+      start_count: 0,
+      crate_chance: 0,
+      crate_count: -1
+    },
+    punch: {
+      start_count: 0,
+      crate_chance: 0,
+      crate_count: -1
+    },
+    pumpkin: {
+      start_count: 0,
+      crate_chance: 0,
+      crate_count: 1
+    },
+    paingiver: {
+      start_count: 0,
+      crate_chance: 0,
+      crate_count: 10
+    }
+  },
+  armoury: [
+    "dig",
+    "phaser",
+    "bazookoid",
+    "grenade",
+    "punch",
+    "pumpkin",
+    "paingiver"
+  ],
+  arrows: {
+    nuclear: "green",
+    player: "red",
+    target: "blue",
+    "asteroid-small": "grey",
+    "asteroid-large": "grey",
+    vortex: "purple",
+    crate: "blue"
+  },
+  spawn: [],
+  mapgen: {
+    type: "random",
+    src: "",
+    gap: 20,
+    w: 1000,
+    h: 1000,
+    blobs: [],
+    decorations: true,
+    small_blobs: 5,
+    large_blobs: 3
+  },
+  events: {
+    frame: {},
+    collect: {},
+    destroy: {},
+    timeout: {},
+    destroy_obj_type: {},
+    destroy_obj_player: {}
+  }
+};
+
 function isMergeableObject(val) {
   var nonNullObject = val && typeof val === "object";
 
@@ -4331,937 +5262,6 @@ function clog(
   }
   console.log(str);
 }
-
-/* ========================================================================
-	Map Generator
-	Blobs
- ========================================================================== */
-
-/* Draw a blob
-	---------------------------------------- */
-
-function mapgen_blob(img, config, decorations, radius, type) {
-  this.size = 36;
-  this.img = img;
-  this.c = config;
-
-  // get land type
-  var type = type || Math.floor(Math.random() * this.c.land_type.length);
-  this.ref = this.c.land_type[type];
-
-  // set up main anchor points
-  var anchors = [];
-  var points = Math.floor(radius / 2) + 4;
-  var spike = Math.floor(radius / 2) + 2;
-  for (var p = 0; p < points; p++) {
-    var new_radius =
-      Math.max(radius - Math.floor(Math.random() * spike), 1) + 1;
-    var x =
-      radius + Math.floor(new_radius * Math.cos((2 * Math.PI * p) / points));
-    var y =
-      radius + Math.floor(new_radius * Math.sin((2 * Math.PI * p) / points));
-    anchors.push({ x: x, y: y });
-  }
-
-  // draw shape to canvas
-  var size = radius * 2 + 1;
-  var shape = mapgen_canvas(size, size);
-  this.draw_path(shape, anchors);
-
-  // build array of land or not tiles
-  var pixels = shape.cont.getImageData(0, 0, shape.w, shape.h);
-  this.land = [];
-  for (var y = 0; y < size; y++) {
-    this.land[y] = [];
-    for (var x = 0; x < size; x++) {
-      var i = (y * size + x) * 4 + 3;
-      this.land[y][x] = pixels.data[i] > 30 ? 1 : 0;
-    }
-  }
-
-  // build tile array and assign corners and land
-  this.tiles = [];
-  for (var y = 0; y < size; y++) {
-    this.tiles[y] = [];
-    for (var x = 0; x < size; x++) {
-      this.tiles[y][x] = this.set_corner_tile(y, x);
-    }
-  }
-
-  // assign pixels a tile value
-  for (var y = 0; y < size; y++) {
-    for (var x = 0; x < size; x++) {
-      this.tiles[y][x] =
-        this.tiles[y][x] === 12 ? this.set_land_tile(y, x) : this.tiles[y][x];
-    }
-  }
-
-  // draw them
-  var wh = (size + 4) * this.size;
-  this.alpha = mapgen_canvas(wh, wh);
-  this.edge = mapgen_canvas(wh, wh);
-  this.bg = mapgen_canvas(wh, wh);
-  for (var y = 0; y < size; y++) {
-    for (var x = 0; x < size; x++) {
-      var tile = this.tiles[y][x];
-      if (tile === -1) {
-        continue;
-      }
-
-      // draw it
-      var x1 = (x + 2) * this.size;
-      var y1 = (y + 2) * this.size;
-      this.draw_to_canvas(this.alpha.cont, x1, y1, tile, 0);
-      this.draw_to_canvas(this.edge.cont, x1, y1, tile, this.ref.edge);
-
-      if (decorations) {
-        this.draw_decoration(this.bg.cont, x, y, tile);
-      }
-    }
-  }
-
-  // draw rest of fg
-  var fg = mapgen_pattern(this.alpha.canv, this.img[this.ref.fg]);
-  fg.cont.drawImage(this.edge.canv, 0, 0);
-
-  // draw dirt bg
-  var fg_dirt = mapgen_pattern(fg.canv, this.img[this.ref.bg]);
-  this.bg.cont.drawImage(fg_dirt.canv, 0, 0);
-
-  // export
-  return {
-    fg: fg,
-    bg: this.bg
-  };
-}
-
-/* Draw an alpha path
-	---------------------------------------- */
-
-mapgen_blob.prototype.draw_path = function(canv, path) {
-  // start paths on canvases
-  canv.cont.beginPath();
-  canv.cont.moveTo(path[0].x, path[0].y);
-
-  // go through path
-  for (var i = 1; i < path.length - 1; i++) {
-    // get next point to curve around
-    var point1 = path[i],
-      point2 = path[i + 1],
-      qx,
-      qy;
-
-    // get curve values
-    if (i < path.length - 1) {
-      qx = (point1.x + point2.x) / 2;
-      qy = (point1.y + point2.y) / 2;
-    } else {
-      qx = point2.x;
-      qy = point2.y;
-    }
-
-    // draw curve to path
-    canv.cont.quadraticCurveTo(point1.x, point1.y, qx, qy);
-  }
-
-  // rejoin the beginning of the path and fill
-  canv.cont.lineTo(path[0].x, path[0].y);
-  canv.cont.fill();
-};
-
-/* Draw a decoration
-	---------------------------------------- */
-
-mapgen_blob.prototype.draw_decoration = function(cont, x, y, tile) {
-  // are we drawing one
-  if (tile > 7 || Math.floor(Math.random() * 2) !== 0) {
-    return;
-  }
-
-  // can we do doubles
-  var double = false;
-  if (tile === 0 && this.is_type(y, x + 1, 0)) {
-    double = true;
-  }
-  if (tile === 1 && this.is_type(y, x - 1, 1)) {
-    double = true;
-  }
-  if (tile === 2 && this.is_type(y - 1, x, 2)) {
-    double = true;
-  }
-  if (tile === 3 && this.is_type(y + 1, x, 3)) {
-    double = true;
-  }
-  if (tile === 4 && this.is_type(y - 1, x + 1, 4)) {
-    double = true;
-  }
-  if (tile === 5 && this.is_type(y + 1, x + 1, 5)) {
-    double = true;
-  }
-  if (tile === 6 && this.is_type(y - 1, x - 1, 6)) {
-    double = true;
-  }
-  if (tile === 7 && this.is_type(y + 1, x - 1, 7)) {
-    double = true;
-  }
-
-  // choose source
-  var source = this.ref.decorations[1];
-  if (double && Math.floor(Math.random() * 2) === 0) {
-    source = this.ref.decorations[2];
-  } else {
-    double = false;
-  }
-
-  // choose decoration
-  var i = Math.floor(Math.random() * source.length);
-  var ref = source[i];
-
-  // get position to draw it
-  var half = this.size / 2;
-  var x1 = (x + 2) * this.size;
-  var y1 = (y + 2) * this.size;
-  var angle = 0;
-  if (tile === 1) {
-    x1 += this.size;
-    y1 += this.size;
-    angle = 180;
-  }
-  if (tile === 2) {
-    y1 += this.size;
-    angle = 270;
-  }
-  if (tile === 3) {
-    x1 += this.size;
-    angle = 90;
-  }
-  if (tile === 4) {
-    y1 += this.size;
-    angle = 315;
-  }
-  if (tile === 5) {
-    angle = 45;
-  }
-  if (tile === 6) {
-    x1 += this.size;
-    y1 += this.size;
-    angle = 225;
-  }
-  if (tile === 7) {
-    x1 += this.size;
-    angle = 135;
-  }
-
-  // draw that shit
-  var x_add = double ? this.size : 0;
-  cont.save();
-  cont.translate(x1, y1);
-  cont.rotate((angle * Math.PI) / 180);
-  cont.drawImage(
-    this.img.decorations,
-    ref.x,
-    ref.y,
-    ref.w,
-    ref.h,
-    0,
-    -ref.h + 5,
-    ref.w,
-    ref.h
-  );
-  cont.translate(-x1, -y1);
-  cont.restore();
-};
-
-/* Draw a tile to a canvas
-	---------------------------------------- */
-
-mapgen_blob.prototype.draw_to_canvas = function(cont, x, y, tile, key) {
-  var ts = this.size;
-  cont.save();
-  cont.translate(x, y);
-  cont.drawImage(this.img.edge, tile * ts, key * ts, ts, ts, 0, 0, ts, ts);
-  cont.translate(-y, -y);
-  cont.restore();
-};
-
-/* Get corner and land tiles
-	---------------------------------------- */
-
-mapgen_blob.prototype.set_corner_tile = function(y, x) {
-  var tile = -1;
-
-  //land
-  if (this.is_land(y, x)) {
-    tile = 12;
-
-    // not land
-  } else {
-    // corners
-    if (
-      !this.is_land(y - 1, x) &&
-      !this.is_land(y, x - 1) &&
-      this.is_land(y + 1, x) &&
-      this.is_land(y, x + 1)
-    ) {
-      tile = 4;
-    } else if (
-      !this.is_land(y - 1, x) &&
-      this.is_land(y, x - 1) &&
-      this.is_land(y + 1, x) &&
-      !this.is_land(y, x + 1)
-    ) {
-      tile = 5;
-    } else if (
-      this.is_land(y - 1, x) &&
-      !this.is_land(y, x - 1) &&
-      !this.is_land(y + 1, x) &&
-      this.is_land(y, x + 1)
-    ) {
-      tile = 6;
-    } else if (
-      this.is_land(y - 1, x) &&
-      this.is_land(y, x - 1) &&
-      !this.is_land(y + 1, x) &&
-      !this.is_land(y, x + 1)
-    ) {
-      tile = 7;
-    }
-  }
-
-  return tile;
-};
-
-/* Set land tile types
-	---------------------------------------- */
-
-mapgen_blob.prototype.set_land_tile = function(y, x) {
-  var tile = 12;
-
-  // corners
-  if (
-    !this.is_land(y - 1, x) &&
-    !this.is_land(y, x - 1) &&
-    this.is_land_or_corner(y + 1, x) &&
-    this.is_land_or_corner(y, x + 1) &&
-    !this.is_corner(y, x - 1) &&
-    !this.is_corner(y - 1, x)
-  ) {
-    tile = 4;
-  } else if (
-    !this.is_land(y - 1, x) &&
-    !this.is_land(y, x + 1) &&
-    this.is_land_or_corner(y, x - 1) &&
-    this.is_land_or_corner(y + 1, x) &&
-    !this.is_corner(y, x + 1) &&
-    !this.is_corner(y - 1, x)
-  ) {
-    tile = 5;
-  } else if (
-    !this.is_land(y, x - 1) &&
-    !this.is_land(y + 1, x) &&
-    this.is_land_or_corner(y - 1, x) &&
-    this.is_land_or_corner(y, x + 1) &&
-    !this.is_corner(y, x - 1) &&
-    !this.is_corner(y + 1, x)
-  ) {
-    tile = 6;
-  } else if (
-    !this.is_land(y + 1, x) &&
-    !this.is_land(y, x + 1) &&
-    this.is_land_or_corner(y - 1, x) &&
-    this.is_land_or_corner(y, x - 1) &&
-    !this.is_corner(y, x + 1) &&
-    !this.is_corner(y + 1, x)
-  ) {
-    tile = 7;
-
-    // flat edges
-  } else if (
-    !this.is_land(y - 1, x) &&
-    this.is_land(y + 1, x) &&
-    !this.is_corner(y - 1, x)
-  ) {
-    tile = 0;
-  } else if (
-    !this.is_land(y + 1, x) &&
-    this.is_land(y - 1, x) &&
-    !this.is_corner(y + 1, x)
-  ) {
-    tile = 1;
-  } else if (
-    !this.is_land(y, x - 1) &&
-    this.is_land(y, x + 1) &&
-    !this.is_corner(y, x - 1)
-  ) {
-    tile = 2;
-  } else if (
-    !this.is_land(y, x + 1) &&
-    this.is_land(y, x - 1) &&
-    !this.is_corner(y, x + 1)
-  ) {
-    tile = 3;
-
-    // inside corners
-  } else if (this.is_type(y + 1, x, 7) || this.is_type(y, x + 1, 7)) {
-    tile = 8;
-  } else if (this.is_type(y + 1, x, 6) || this.is_type(y, x - 1, 6)) {
-    tile = 9;
-  } else if (this.is_type(y - 1, x, 5) || this.is_type(y, x + 1, 5)) {
-    tile = 10;
-  } else if (this.is_type(y - 1, x, 4) || this.is_type(y, x - 1, 4)) {
-    tile = 11;
-  }
-
-  return tile;
-};
-
-/* Check arrays for values
-	---------------------------------------- */
-
-mapgen_blob.prototype.is_land_or_corner = function(y, x) {
-  if (this.is_corner(y, x) || this.is_land(y, x)) {
-    return true;
-  }
-};
-
-mapgen_blob.prototype.is_corner = function(y, x) {
-  return this.check_arr(this.tiles, y, x, [4, 5, 6, 7]);
-};
-
-mapgen_blob.prototype.is_type = function(y, x, type) {
-  return this.check_arr(this.tiles, y, x, [type]);
-};
-
-mapgen_blob.prototype.is_land = function(y, x) {
-  return this.check_arr(this.land, y, x, [1]);
-};
-
-mapgen_blob.prototype.check_arr = function(arr, y, x, checks) {
-  if (y < 0 || y >= arr.length || x < 0 || x >= arr[0].length) {
-    return false;
-  }
-  for (var i = 0; i < checks.length; i++) {
-    if (arr[y][x] == checks[i]) {
-      return true;
-    }
-  }
-};
-
-/* ========================================================================
-	Map Generator
-	Make Canvas
- ========================================================================== */
-
-/* Set up a new canvas
-	---------------------------------------- */
-
-function mapgen_canvas(w, h) {
-  var obj = {};
-  if ("undefined" != typeof global) {
-    obj.canv = new canvas();
-  } else {
-    obj.canv = document.createElement("canvas");
-  }
-  obj.cont = obj.canv.getContext("2d");
-  obj.canv.width = w;
-  obj.canv.height = h;
-  obj.cont.fillStyle = "#fff";
-  obj.w = w;
-  obj.h = h;
-  return obj;
-}
-
-/* Draw a pattern to a canvas
-	---------------------------------------- */
-
-function mapgen_pattern(alpha, pattern) {
-  var canv = mapgen_canvas(alpha.width, alpha.height);
-  if (typeof pattern !== "string") {
-    pattern = canv.cont.createPattern(pattern, "repeat");
-  }
-  canv.cont.fillStyle = pattern;
-  canv.cont.fillRect(0, 0, alpha.width, alpha.height);
-  canv.cont.globalCompositeOperation = "destination-in";
-  canv.cont.drawImage(alpha, 0, 0);
-  canv.cont.globalCompositeOperation = "normal";
-
-  return canv;
-}
-
-/* ========================================================================
-	Map Generator
-	------------
-	Config:
-	w           // width of map
-	h           // height of map
-	crust       // thickness of outer crust on land
-	blobs       // initial blobs
-	center_blob // size of center blob of land, 0 for none
-	small_blobs // number of random small circles of land
-	large_blobs // number of random large circles of land
-	-----------
- ========================================================================== */
-
-/* Server side only
-	---------------------------------------- */
-
-if ("undefined" != typeof global) {
-  var fs = require("fs");
-}
-
-/* New Map Generation
-	---------------------------------------- */
-
-function mapgen(img, config, scheme, map_img) {
-  this.size = 36;
-  this.img = img;
-  this.c = config;
-  this.scheme = scheme;
-
-  // choose type
-  if (this.scheme.type == "random") {
-    return this.draw_random();
-  }
-  if (this.scheme.type == "image") {
-    return this.draw_image(map_img);
-  }
-}
-
-/* Draw image
-	---------------------------------------- */
-
-mapgen.prototype.draw_image = function(map_img) {
-  var fg = mapgen_canvas(
-    map_img.width + this.scheme.gap * 2,
-    map_img.height + this.scheme.gap * 2
-  );
-  fg.cont.drawImage(map_img, this.scheme.gap, this.scheme.gap);
-  var bg = mapgen_pattern(fg.canv, this.img.dirt);
-  return { fg: fg, bg: bg };
-};
-
-/* Draw random
-	---------------------------------------- */
-
-mapgen.prototype.draw_random = function() {
-  // setup
-  this.blobs = JSON.parse(JSON.stringify(this.scheme.blobs));
-  this.bg = mapgen_canvas(this.scheme.w, this.scheme.h);
-  this.fg = mapgen_canvas(this.scheme.w, this.scheme.h);
-
-  // generate some random large circles
-  for (var i = 0; i < this.scheme.large_blobs; i++) {
-    this.blobs = this.get_circle(this.blobs, 4, 6);
-  }
-
-  // generate some random small circles
-  for (var i = 0; i < this.scheme.small_blobs; i++) {
-    this.blobs = this.get_circle(this.blobs, 1, 3);
-  }
-
-  // go through each blob
-  for (var i = 0; i < this.blobs.length; i++) {
-    var blob = this.blobs[i];
-
-    // create the blobs
-    var bg = new mapgen_blob(this.img, this.c, false, blob.r + 4, blob.type);
-    var fg = new mapgen_blob(
-      this.img,
-      this.c,
-      this.scheme.decorations,
-      blob.r,
-      blob.type
-    );
-
-    // combine the backgrounds
-    var wh = fg.fg.canv.width;
-    var new_bg = mapgen_canvas(wh, wh);
-    new_bg.cont.drawImage(bg.fg.canv, wh * 0.1, wh * 0.1, wh * 0.8, wh * 0.8);
-    new_bg.cont.globalCompositeOperation = "source-atop";
-    new_bg.cont.fillStyle = "rgba(0,0,0,0.8)";
-    new_bg.cont.fillRect(0, 0, wh, wh);
-    new_bg.cont.globalCompositeOperation = "normal";
-    new_bg.cont.drawImage(fg.bg.canv, 0, 0);
-
-    // draw it to main canvas
-    this.bg.cont.drawImage(new_bg.canv, blob.x - wh / 2, blob.y - wh / 2);
-    this.fg.cont.drawImage(fg.fg.canv, blob.x - wh / 2, blob.y - wh / 2);
-  }
-
-  // return it
-  return {
-    bg: this.bg,
-    fg: this.fg
-  };
-};
-
-/* Get a far away circle
-	---------------------------------------- */
-
-mapgen.prototype.get_circle = function(arr, min_radius, max_radius) {
-  // generate many circles and find furthest away
-  var distance = 0;
-  var circle = null;
-
-  for (var i = 0; i < 20; i++) {
-    // make new circle
-    var test_circle = this.circle(min_radius, max_radius);
-    var smallest_distance = 999999;
-
-    // find shortest distance from all other circles
-    for (var j = 0; j < arr.length; j++) {
-      var dx = arr[j].x - test_circle.x;
-      var dy = arr[j].y - test_circle.y;
-      var test_distance = Math.round(
-        Math.sqrt(Math.pow(dx, 2) + Math.pow(dy, 2))
-      );
-      smallest_distance =
-        test_distance < smallest_distance ? test_distance : smallest_distance;
-    }
-
-    // if is the largest distance record this as furthest
-    if (distance < smallest_distance) {
-      distance = smallest_distance;
-      circle = test_circle;
-    }
-  }
-
-  // add furthest away circle to new array
-  arr.push(circle);
-  return arr;
-};
-
-/* Generate a random circle
-	---------------------------------------- */
-
-mapgen.prototype.circle = function(min_radius, max_radius) {
-  var r = Math.floor(Math.random() * max_radius) + min_radius;
-  var gap = (r + 2) * this.size + this.scheme.gap;
-  var x = Math.floor(Math.random() * (this.scheme.w - gap * 2)) + gap;
-  var y = Math.floor(Math.random() * (this.scheme.h - gap * 2)) + gap;
-  return {
-    r: r,
-    x: x,
-    y: y
-  };
-};
-
-var schemes = schemes || {};
-schemes.deathmatch = {
-  title: "Deathmatch",
-  time_limit: 0,
-  destroy_land: true,
-  gravity: 2,
-  score: true,
-  drops: {
-    crate: {
-      time: 100,
-      max: 1
-    },
-    medpack: {
-      time: 100,
-      add: 30,
-      max: 1
-    },
-    "gem-1": {
-      time: 100,
-      max: 5
-    },
-    "gem-5": {
-      time: 150,
-      max: 1
-    },
-    "gem-20": {
-      time: 500,
-      max: 1
-    }
-  },
-  weapons: {
-    dig: {
-      start_count: -1,
-      crate_chance: 0,
-      crate_count: -1
-    },
-    phaser: {
-      start_count: -1,
-      crate_chance: 0,
-      crate_count: -1
-    },
-    bazookoid: {
-      start_count: -1,
-      crate_chance: 0,
-      crate_count: -1
-    },
-    grenade: {
-      start_count: -1,
-      crate_chance: 0,
-      crate_count: -1
-    },
-    punch: {
-      start_count: -1,
-      crate_chance: 0,
-      crate_count: -1
-    },
-    pumpkin: {
-      start_count: 5,
-      crate_chance: 1,
-      crate_count: 5
-    },
-    paingiver: {
-      start_count: 20,
-      crate_chance: 1,
-      crate_count: 5
-    }
-  },
-  mapgen: {
-    type: "random",
-    src: "",
-    gap: 20,
-    w: 1900,
-    h: 1400,
-    blobs: [],
-    decorations: true,
-    small_blobs: 5,
-    large_blobs: 3
-  },
-  events: {
-    frame: {},
-    collect: {},
-    destroy: {},
-    timeout: {},
-    destroy_obj_type: {},
-    destroy_obj_player: {}
-  }
-};
-
-var schemes = schemes || {};
-schemes.default = {
-  title: "",
-  description: "",
-  time_limit: 0,
-  show_time: true,
-  destroy_land: true,
-  gravity_type: "land",
-  gravity: 1,
-  stars: {},
-  score: false,
-  health: true,
-  levels: {
-    score: [
-      0,
-      10,
-      25,
-      40,
-      60,
-      90,
-      120,
-      150,
-      200,
-      250,
-      300,
-      360,
-      420,
-      490,
-      570,
-      650,
-      720,
-      810,
-      900,
-      1000
-    ],
-    health: [
-      100,
-      120,
-      120,
-      120,
-      140,
-      140,
-      140,
-      140,
-      160,
-      180,
-      200,
-      200,
-      200,
-      200,
-      220,
-      220,
-      220,
-      220,
-      240,
-      300
-    ],
-    damage: [
-      0,
-      10,
-      10,
-      15,
-      15,
-      15,
-      15,
-      20,
-      20,
-      25,
-      25,
-      25,
-      30,
-      30,
-      30,
-      30,
-      35,
-      35,
-      35,
-      50
-    ],
-    speed: [
-      4,
-      6,
-      8,
-      8,
-      8,
-      8,
-      10,
-      10,
-      10,
-      12,
-      12,
-      12,
-      12,
-      14,
-      14,
-      14,
-      14,
-      16,
-      16,
-      20
-    ],
-    jump: [
-      10,
-      12,
-      12,
-      12,
-      12,
-      15,
-      15,
-      15,
-      15,
-      18,
-      18,
-      20,
-      20,
-      20,
-      20,
-      20,
-      20,
-      20,
-      20,
-      25
-    ]
-  },
-  drops: {
-    crate: {
-      time: 0,
-      max: 20
-    },
-    medpack: {
-      time: 0,
-      add: 30,
-      max: 50
-    },
-    nuclear: {
-      time: 0,
-      max: 20
-    },
-    target: {
-      time: 0,
-      max: 100
-    },
-    asteroid_center: {
-      time: 0,
-      increase_frequency: false,
-      max: 30
-    },
-    "gem-1": {
-      time: 0,
-      max: 20
-    }
-  },
-  weapons: {
-    dig: {
-      start_count: -1,
-      crate_chance: 0,
-      crate_count: -1
-    },
-    phaser: {
-      start_count: 0,
-      crate_chance: 0,
-      crate_count: -1
-    },
-    bazookoid: {
-      start_count: 0,
-      crate_chance: 0,
-      crate_count: -1
-    },
-    grenade: {
-      start_count: 0,
-      crate_chance: 0,
-      crate_count: -1
-    },
-    punch: {
-      start_count: 0,
-      crate_chance: 0,
-      crate_count: -1
-    },
-    pumpkin: {
-      start_count: 0,
-      crate_chance: 0,
-      crate_count: 1
-    },
-    paingiver: {
-      start_count: 0,
-      crate_chance: 0,
-      crate_count: 10
-    }
-  },
-  armoury: [
-    "dig",
-    "phaser",
-    "bazookoid",
-    "grenade",
-    "punch",
-    "pumpkin",
-    "paingiver"
-  ],
-  arrows: {
-    nuclear: "green",
-    player: "red",
-    target: "blue",
-    "asteroid-small": "grey",
-    "asteroid-large": "grey",
-    vortex: "purple",
-    crate: "blue"
-  },
-  spawn: [],
-  mapgen: {
-    type: "random",
-    src: "",
-    gap: 20,
-    w: 1000,
-    h: 1000,
-    blobs: [],
-    decorations: true,
-    small_blobs: 5,
-    large_blobs: 3
-  },
-  events: {
-    frame: {},
-    collect: {},
-    destroy: {},
-    timeout: {},
-    destroy_obj_type: {},
-    destroy_obj_player: {}
-  }
-};
 
 /* ========================================================================
 	Map Gravity
