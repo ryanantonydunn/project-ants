@@ -12,3 +12,5 @@ Project Ants is a fully functional multiplayer action browser with custom physic
 * Image based maps that can be customised
 * Procedurally generated random maps
 * Map based gravity
+
+[Single player demo](https://ryanantonydunn.github.io/project-ants/)
