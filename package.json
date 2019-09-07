@@ -2,6 +2,7 @@
   "name": "projectants",
   "version": "1.0.0",
   "description": "",
+  "homepage": "https://ryanantonydunn.github.io/project-ants",
   "scripts": {
     "demo": "http-server",
     "server": "PORT_LISTENER=15000 PLAYER_LIMIT=10 node public/lobby.js",
