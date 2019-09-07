@@ -64,6 +64,51 @@ function input(callback) {
     self.input_button(e.button, "up");
   };
 
+  this.singleTapped = false;
+  this.doubleTapped = false;
+  this.waitingForDouble = false;
+  this.twoFingerTap = false;
+
+  document.body.ontouchstart = function(e) {
+    if (e.target.id === "game_input") {
+      var touch = e.touches[e.touches.length - 1];
+      self.input_cursor(touch.clientX, touch.clientY);
+      self.singleTapped = true;
+      console.log(e.touches.length);
+      if (e.touches.length > 1) {
+        self.twoFingerTap = true;
+      }
+      if (self.waitingForDouble) {
+          self.doubleTapped = true;
+          setTimeout(function() {
+            self.doubleTapped = false;
+          }, 20);
+      } else {
+        self.waitingForDouble = true;
+      }
+      setTimeout(function() {
+        self.waitingForDouble = false;
+      }, 300);
+    }
+  }
+
+  document.body.ontouchend = function(e) {
+    self.singleTapped = false;
+    self.twoFingerTap = false;
+  }
+
+  document.body.ontouchmove = function(e) {
+    if (e.target.id === "game_input") {
+      var touch = e.touches[e.touches.length - 1];
+      self.input_cursor(touch.clientX, touch.clientY);
+    }
+  }
+
+  // self.input_cursor(e.clientX, e.clientY);
+
+  // manage touch events
+
+
   // mouse wheel
   // if ("onmousewheel" in document.body) {
   //   document.body.onmousewheel = function(e) {
@@ -97,6 +142,18 @@ function input(callback) {
 	---------------------------------------- */
 
 input.prototype.active = function(type) {
+  // touch
+  if (type === 'jump' && this.twoFingerTap) {
+    return true;
+  }
+  if (type === 'shoot' && this.doubleTapped) {
+    return true;
+  }
+  if (type === 'move' && this.singleTapped) {
+    return true;
+  }
+
+  // mouse keyboard
   const action = this.action_keys[type];
   if (!action) {
     return;

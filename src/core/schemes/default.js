@@ -3,7 +3,7 @@ schemes.default = {
   title: "",
   description: "",
   time_limit: 0,
-  show_time: true,
+  show_time: false,
   destroy_land: true,
   gravity_type: "land",
   gravity: 1,

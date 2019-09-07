@@ -68,7 +68,5 @@ demo.prototype.loaded = function(img) {
   );
   this.game.set_armoury();
 
-  console.log(this.game.core.state);
-
   this.loop_start();
 };

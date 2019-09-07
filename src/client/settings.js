@@ -19,9 +19,21 @@ app.prototype.init_settings = function() {
   append(this.icon_settings, this.icon_settings_img);
 
   this.settings_visible = false;
-  this.icon_settings.onclick = function() {
+  this.icon_settings_img.onclick = function() {
     self.toggle_settings_screen();
   };
+
+  this.icon_settings_fullscreen = element({
+    type: "img",
+    src: this.assets_url + "/images/fullscreen.png"
+  });
+  append(this.icon_settings, this.icon_settings_fullscreen);
+  this.icon_settings_fullscreen.onclick = function() {
+    document.body.requestFullscreen();
+  };
+
+
+
 
   // box
   this.div_settings = element({ class: "full full_bg" });
@@ -49,7 +61,7 @@ app.prototype.init_settings = function() {
   };
 
   // controls
-  var ctext = "<h2>Controls</h2>";
+  var ctext = "<h2>Controls (Mouse + Keyboard)</h2>";
   ctext += "<dl>";
   ctext += "<dt>Move</dt><dd>Left Click</dd>";
   ctext += "<dt>Jump</dt><dd>Spacebar</dd>";
@@ -58,15 +70,15 @@ app.prototype.init_settings = function() {
   ctext += "<dt>Follow Weapons</dt><dd>F</dd>";
   ctext += "<dt>Free Cam</dt><dd>Middle Click</dd>";
   ctext += "</dl>";
+  ctext += "<h2>Controls (Touchscreen)</h2>";
+  ctext += "<dl>";
+  ctext += "<dt>Move</dt><dd>Tap</dd>";
+  ctext += "<dt>Shoot</dt><dd>Double Tap</dd>";
+  ctext += "<dt>Jump</dt><dd>Two finger tap</dd>";
+  ctext += "</dl>";
+
   this.div_controls = element({ text: ctext });
   append(this.div_settings_cont, this.div_controls);
-
-  // server
-  this.div_server = element({
-    text:
-      "<h2>Server</h2><p><a href='http://uk.projectants.com/'>UK</a> | <a href='http://us.projectants.com/'>US</a></p>"
-  });
-  append(this.div_settings_cont, this.div_server);
 
   // close button
   this.div_settings_buttons = element({ class: "buttons" });
