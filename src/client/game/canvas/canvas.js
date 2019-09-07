@@ -6,32 +6,38 @@
 /* Set up canvas
     ---------------------------------------- */
 
-game.prototype.init_canvas = function() {
-  // set up main canvas dimensions and position
+function setCanvasWidth(canvas) {
   var d = select("projectants");
-  this.canvas = {};
-
   // limit game size
-  this.canvas.w = d.offsetWidth;
-  this.canvas.h = d.offsetHeight;
-  if (this.canvas.h < 800) {
-    this.canvas.w = round(this.canvas.w * (800 / this.canvas.h));
-    this.canvas.h = round(this.canvas.h * (800 / this.canvas.h));
+  canvas.w = d.offsetWidth;
+  canvas.h = d.offsetHeight;
+  if (canvas.h < 800) {
+    canvas.w = round(canvas.w * (800 / canvas.h));
+    canvas.h = round(canvas.h * (800 / canvas.h));
   }
-  if (this.canvas.h > 1000) {
-    this.canvas.w = round(this.canvas.w * (1000 / this.canvas.h));
-    this.canvas.h = round(this.canvas.h * (1000 / this.canvas.h));
+  if (canvas.h > 1000) {
+    canvas.w = round(canvas.w * (1000 / canvas.h));
+    canvas.h = round(canvas.h * (1000 / canvas.h));
   }
-  this.canvas.cx = round(this.canvas.w / 2);
-  this.canvas.cy = round(this.canvas.h / 2);
+  canvas.cx = round(canvas.w / 2);
+  canvas.cy = round(canvas.h / 2);
 
-  // initialise main canvas
+  canvas.canv.width = canvas.w;
+  canvas.canv.height = canvas.h;
+  canvas.cont = canvas.canv.getContext("2d");
+}
+
+game.prototype.init_canvas = function() {
+  // set up main canvas
+  this.canvas = {};
   this.canvas.canv = element({ type: "canvas" });
   this.canvas.canv.style.position = "relative";
-  this.canvas.cont = this.canvas.canv.getContext("2d");
-  this.canvas.canv.width = this.canvas.w;
-  this.canvas.canv.height = this.canvas.h;
+  setCanvasWidth(this.canvas);
 
+  var self = this;
+  window.addEventListener("resize", function() {
+    setCanvasWidth(self.canvas);
+  });
   append(this.div, this.canvas.canv);
 };
 

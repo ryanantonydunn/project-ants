@@ -29,7 +29,12 @@ app.prototype.init_settings = function() {
   });
   append(this.icon_settings, this.icon_settings_fullscreen);
   this.icon_settings_fullscreen.onclick = function() {
-    document.body.requestFullscreen();
+    var isFullscreen = document.fullscreenElement !== null;
+    if (isFullscreen) {
+      document.exitFullscreen();
+    } else {
+      document.body.requestFullscreen();
+    }
   };
 
 

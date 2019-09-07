@@ -12,7 +12,7 @@
     "server:single:dev": "DOMAIN=http://localhost npm run server:single",
     "server:single:production": "DOMAIN=http://projectants.com DISABLE_ASSET_PORT=true npm run server:single",
     "build": "gulp build --production",
-    "predeploy": "npm run build && mkdir -p ./docs && rm -f -r ./docs/* && cp -a ./public/. ./docs/",
+    "predeploy": "npm run build && mkdir -p ./docs && rm -f -r ./docs/* && cp -a ./public/. ./docs/ && rm -f ./docs/index.html && mv ./docs/githubindex.html ./docs/index.html",
     "test": "",
     "start": ""
   },

@@ -64,22 +64,20 @@ function input(callback) {
     self.input_button(e.button, "up");
   };
 
-  this.singleTapped = false;
-  this.doubleTapped = false;
-  this.waitingForDouble = false;
+  this.oneFingerTap = false;
   this.twoFingerTap = false;
+  this.waitingForDouble = false;
+  this.doubleTapped = false;
 
   document.body.ontouchstart = function(e) {
     if (e.target.id === "game_input") {
-      var touch = e.touches[e.touches.length - 1];
+      var touch = e.touches[0];
       self.input_cursor(touch.clientX, touch.clientY);
-      self.singleTapped = true;
-      console.log(e.touches.length);
-      if (e.touches.length > 1) {
-        self.twoFingerTap = true;
-      }
+      self.oneFingerTap = (e.touches.length === 1);
+      self.twoFingerTap = !self.oneFingerTap;
       if (self.waitingForDouble) {
           self.doubleTapped = true;
+          self.waitingForDouble = false;
           setTimeout(function() {
             self.doubleTapped = false;
           }, 20);
@@ -93,13 +91,13 @@ function input(callback) {
   }
 
   document.body.ontouchend = function(e) {
-    self.singleTapped = false;
+    self.oneFingerTap = false;
     self.twoFingerTap = false;
   }
 
   document.body.ontouchmove = function(e) {
     if (e.target.id === "game_input") {
-      var touch = e.touches[e.touches.length - 1];
+      var touch = e.touches[0];
       self.input_cursor(touch.clientX, touch.clientY);
     }
   }
@@ -143,13 +141,13 @@ function input(callback) {
 
 input.prototype.active = function(type) {
   // touch
-  if (type === 'jump' && this.twoFingerTap) {
+  if (type === 'jump' && this.doubleTapped) {
     return true;
   }
-  if (type === 'shoot' && this.doubleTapped) {
+  if (type === 'shoot' && this.twoFingerTap) {
     return true;
   }
-  if (type === 'move' && this.singleTapped) {
+  if (type === 'move' && this.oneFingerTap) {
     return true;
   }
 

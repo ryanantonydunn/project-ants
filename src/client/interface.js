@@ -3,6 +3,7 @@
  ========================================================================== */
 
 app.prototype.init_interface = function() {
+  var self = this;
   this.div = element({ id: "projectants", class: "app" });
   append(document.body, this.div);
 
@@ -25,14 +26,11 @@ app.prototype.init_interface = function() {
     window.location = "/";
   };
 
-  // limit game aspect ratio
-  var ratio = this.div.offsetWidth / this.div.offsetHeight;
-  this.div.style.width =
-    ratio > 1.8
-      ? round(this.div.offsetHeight * 1.8) + "px"
-      : this.div.offsetWidth + "px";
-  this.div.style.height =
-    ratio < 1 ? this.div.offsetWidth + "px" : this.div.offsetHeight + "px";
+  setDimensions(this.div);
+  window.addEventListener("resize", function() {
+    console.log("yes");
+    setDimensions(self.div);
+  });
 
   // loading
   this.loading = element({
@@ -42,3 +40,14 @@ app.prototype.init_interface = function() {
   append(this.div, this.loading);
   hide(this.loading);
 };
+
+// limit game aspect ratio
+function setDimensions(div) {
+  var ratio = document.body.offsetWidth / document.body.offsetHeight;
+  div.style.width =
+    ratio > 1.8
+      ? round(document.body.offsetHeight * 1.8) + "px"
+      : document.body.offsetWidth + "px";
+  div.style.height =
+    ratio < 1 ? document.body.offsetWidth + "px" : document.body.offsetHeight + "px";
+}

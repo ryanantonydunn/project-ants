@@ -1,3 +1,617 @@
+/* ========================================================================
+	Map Generator
+	Blobs
+ ========================================================================== */
+
+/* Draw a blob
+	---------------------------------------- */
+
+function mapgen_blob(img, config, decorations, radius, type) {
+  this.size = 36;
+  this.img = img;
+  this.c = config;
+
+  // get land type
+  var type = type || Math.floor(Math.random() * this.c.land_type.length);
+  this.ref = this.c.land_type[type];
+
+  // set up main anchor points
+  var anchors = [];
+  var points = Math.floor(radius / 2) + 4;
+  var spike = Math.floor(radius / 2) + 2;
+  for (var p = 0; p < points; p++) {
+    var new_radius =
+      Math.max(radius - Math.floor(Math.random() * spike), 1) + 1;
+    var x =
+      radius + Math.floor(new_radius * Math.cos((2 * Math.PI * p) / points));
+    var y =
+      radius + Math.floor(new_radius * Math.sin((2 * Math.PI * p) / points));
+    anchors.push({ x: x, y: y });
+  }
+
+  // draw shape to canvas
+  var size = radius * 2 + 1;
+  var shape = mapgen_canvas(size, size);
+  this.draw_path(shape, anchors);
+
+  // build array of land or not tiles
+  var pixels = shape.cont.getImageData(0, 0, shape.w, shape.h);
+  this.land = [];
+  for (var y = 0; y < size; y++) {
+    this.land[y] = [];
+    for (var x = 0; x < size; x++) {
+      var i = (y * size + x) * 4 + 3;
+      this.land[y][x] = pixels.data[i] > 30 ? 1 : 0;
+    }
+  }
+
+  // build tile array and assign corners and land
+  this.tiles = [];
+  for (var y = 0; y < size; y++) {
+    this.tiles[y] = [];
+    for (var x = 0; x < size; x++) {
+      this.tiles[y][x] = this.set_corner_tile(y, x);
+    }
+  }
+
+  // assign pixels a tile value
+  for (var y = 0; y < size; y++) {
+    for (var x = 0; x < size; x++) {
+      this.tiles[y][x] =
+        this.tiles[y][x] === 12 ? this.set_land_tile(y, x) : this.tiles[y][x];
+    }
+  }
+
+  // draw them
+  var wh = (size + 4) * this.size;
+  this.alpha = mapgen_canvas(wh, wh);
+  this.edge = mapgen_canvas(wh, wh);
+  this.bg = mapgen_canvas(wh, wh);
+  for (var y = 0; y < size; y++) {
+    for (var x = 0; x < size; x++) {
+      var tile = this.tiles[y][x];
+      if (tile === -1) {
+        continue;
+      }
+
+      // draw it
+      var x1 = (x + 2) * this.size;
+      var y1 = (y + 2) * this.size;
+      this.draw_to_canvas(this.alpha.cont, x1, y1, tile, 0);
+      this.draw_to_canvas(this.edge.cont, x1, y1, tile, this.ref.edge);
+
+      if (decorations) {
+        this.draw_decoration(this.bg.cont, x, y, tile);
+      }
+    }
+  }
+
+  // draw rest of fg
+  var fg = mapgen_pattern(this.alpha.canv, this.img[this.ref.fg]);
+  fg.cont.drawImage(this.edge.canv, 0, 0);
+
+  // draw dirt bg
+  var fg_dirt = mapgen_pattern(fg.canv, this.img[this.ref.bg]);
+  this.bg.cont.drawImage(fg_dirt.canv, 0, 0);
+
+  // export
+  return {
+    fg: fg,
+    bg: this.bg
+  };
+}
+
+/* Draw an alpha path
+	---------------------------------------- */
+
+mapgen_blob.prototype.draw_path = function(canv, path) {
+  // start paths on canvases
+  canv.cont.beginPath();
+  canv.cont.moveTo(path[0].x, path[0].y);
+
+  // go through path
+  for (var i = 1; i < path.length - 1; i++) {
+    // get next point to curve around
+    var point1 = path[i],
+      point2 = path[i + 1],
+      qx,
+      qy;
+
+    // get curve values
+    if (i < path.length - 1) {
+      qx = (point1.x + point2.x) / 2;
+      qy = (point1.y + point2.y) / 2;
+    } else {
+      qx = point2.x;
+      qy = point2.y;
+    }
+
+    // draw curve to path
+    canv.cont.quadraticCurveTo(point1.x, point1.y, qx, qy);
+  }
+
+  // rejoin the beginning of the path and fill
+  canv.cont.lineTo(path[0].x, path[0].y);
+  canv.cont.fill();
+};
+
+/* Draw a decoration
+	---------------------------------------- */
+
+mapgen_blob.prototype.draw_decoration = function(cont, x, y, tile) {
+  // are we drawing one
+  if (tile > 7 || Math.floor(Math.random() * 2) !== 0) {
+    return;
+  }
+
+  // can we do doubles
+  var double = false;
+  if (tile === 0 && this.is_type(y, x + 1, 0)) {
+    double = true;
+  }
+  if (tile === 1 && this.is_type(y, x - 1, 1)) {
+    double = true;
+  }
+  if (tile === 2 && this.is_type(y - 1, x, 2)) {
+    double = true;
+  }
+  if (tile === 3 && this.is_type(y + 1, x, 3)) {
+    double = true;
+  }
+  if (tile === 4 && this.is_type(y - 1, x + 1, 4)) {
+    double = true;
+  }
+  if (tile === 5 && this.is_type(y + 1, x + 1, 5)) {
+    double = true;
+  }
+  if (tile === 6 && this.is_type(y - 1, x - 1, 6)) {
+    double = true;
+  }
+  if (tile === 7 && this.is_type(y + 1, x - 1, 7)) {
+    double = true;
+  }
+
+  // choose source
+  var source = this.ref.decorations[1];
+  if (double && Math.floor(Math.random() * 2) === 0) {
+    source = this.ref.decorations[2];
+  } else {
+    double = false;
+  }
+
+  // choose decoration
+  var i = Math.floor(Math.random() * source.length);
+  var ref = source[i];
+
+  // get position to draw it
+  var half = this.size / 2;
+  var x1 = (x + 2) * this.size;
+  var y1 = (y + 2) * this.size;
+  var angle = 0;
+  if (tile === 1) {
+    x1 += this.size;
+    y1 += this.size;
+    angle = 180;
+  }
+  if (tile === 2) {
+    y1 += this.size;
+    angle = 270;
+  }
+  if (tile === 3) {
+    x1 += this.size;
+    angle = 90;
+  }
+  if (tile === 4) {
+    y1 += this.size;
+    angle = 315;
+  }
+  if (tile === 5) {
+    angle = 45;
+  }
+  if (tile === 6) {
+    x1 += this.size;
+    y1 += this.size;
+    angle = 225;
+  }
+  if (tile === 7) {
+    x1 += this.size;
+    angle = 135;
+  }
+
+  // draw that shit
+  var x_add = double ? this.size : 0;
+  cont.save();
+  cont.translate(x1, y1);
+  cont.rotate((angle * Math.PI) / 180);
+  cont.drawImage(
+    this.img.decorations,
+    ref.x,
+    ref.y,
+    ref.w,
+    ref.h,
+    0,
+    -ref.h + 5,
+    ref.w,
+    ref.h
+  );
+  cont.translate(-x1, -y1);
+  cont.restore();
+};
+
+/* Draw a tile to a canvas
+	---------------------------------------- */
+
+mapgen_blob.prototype.draw_to_canvas = function(cont, x, y, tile, key) {
+  var ts = this.size;
+  cont.save();
+  cont.translate(x, y);
+  cont.drawImage(this.img.edge, tile * ts, key * ts, ts, ts, 0, 0, ts, ts);
+  cont.translate(-y, -y);
+  cont.restore();
+};
+
+/* Get corner and land tiles
+	---------------------------------------- */
+
+mapgen_blob.prototype.set_corner_tile = function(y, x) {
+  var tile = -1;
+
+  //land
+  if (this.is_land(y, x)) {
+    tile = 12;
+
+    // not land
+  } else {
+    // corners
+    if (
+      !this.is_land(y - 1, x) &&
+      !this.is_land(y, x - 1) &&
+      this.is_land(y + 1, x) &&
+      this.is_land(y, x + 1)
+    ) {
+      tile = 4;
+    } else if (
+      !this.is_land(y - 1, x) &&
+      this.is_land(y, x - 1) &&
+      this.is_land(y + 1, x) &&
+      !this.is_land(y, x + 1)
+    ) {
+      tile = 5;
+    } else if (
+      this.is_land(y - 1, x) &&
+      !this.is_land(y, x - 1) &&
+      !this.is_land(y + 1, x) &&
+      this.is_land(y, x + 1)
+    ) {
+      tile = 6;
+    } else if (
+      this.is_land(y - 1, x) &&
+      this.is_land(y, x - 1) &&
+      !this.is_land(y + 1, x) &&
+      !this.is_land(y, x + 1)
+    ) {
+      tile = 7;
+    }
+  }
+
+  return tile;
+};
+
+/* Set land tile types
+	---------------------------------------- */
+
+mapgen_blob.prototype.set_land_tile = function(y, x) {
+  var tile = 12;
+
+  // corners
+  if (
+    !this.is_land(y - 1, x) &&
+    !this.is_land(y, x - 1) &&
+    this.is_land_or_corner(y + 1, x) &&
+    this.is_land_or_corner(y, x + 1) &&
+    !this.is_corner(y, x - 1) &&
+    !this.is_corner(y - 1, x)
+  ) {
+    tile = 4;
+  } else if (
+    !this.is_land(y - 1, x) &&
+    !this.is_land(y, x + 1) &&
+    this.is_land_or_corner(y, x - 1) &&
+    this.is_land_or_corner(y + 1, x) &&
+    !this.is_corner(y, x + 1) &&
+    !this.is_corner(y - 1, x)
+  ) {
+    tile = 5;
+  } else if (
+    !this.is_land(y, x - 1) &&
+    !this.is_land(y + 1, x) &&
+    this.is_land_or_corner(y - 1, x) &&
+    this.is_land_or_corner(y, x + 1) &&
+    !this.is_corner(y, x - 1) &&
+    !this.is_corner(y + 1, x)
+  ) {
+    tile = 6;
+  } else if (
+    !this.is_land(y + 1, x) &&
+    !this.is_land(y, x + 1) &&
+    this.is_land_or_corner(y - 1, x) &&
+    this.is_land_or_corner(y, x - 1) &&
+    !this.is_corner(y, x + 1) &&
+    !this.is_corner(y + 1, x)
+  ) {
+    tile = 7;
+
+    // flat edges
+  } else if (
+    !this.is_land(y - 1, x) &&
+    this.is_land(y + 1, x) &&
+    !this.is_corner(y - 1, x)
+  ) {
+    tile = 0;
+  } else if (
+    !this.is_land(y + 1, x) &&
+    this.is_land(y - 1, x) &&
+    !this.is_corner(y + 1, x)
+  ) {
+    tile = 1;
+  } else if (
+    !this.is_land(y, x - 1) &&
+    this.is_land(y, x + 1) &&
+    !this.is_corner(y, x - 1)
+  ) {
+    tile = 2;
+  } else if (
+    !this.is_land(y, x + 1) &&
+    this.is_land(y, x - 1) &&
+    !this.is_corner(y, x + 1)
+  ) {
+    tile = 3;
+
+    // inside corners
+  } else if (this.is_type(y + 1, x, 7) || this.is_type(y, x + 1, 7)) {
+    tile = 8;
+  } else if (this.is_type(y + 1, x, 6) || this.is_type(y, x - 1, 6)) {
+    tile = 9;
+  } else if (this.is_type(y - 1, x, 5) || this.is_type(y, x + 1, 5)) {
+    tile = 10;
+  } else if (this.is_type(y - 1, x, 4) || this.is_type(y, x - 1, 4)) {
+    tile = 11;
+  }
+
+  return tile;
+};
+
+/* Check arrays for values
+	---------------------------------------- */
+
+mapgen_blob.prototype.is_land_or_corner = function(y, x) {
+  if (this.is_corner(y, x) || this.is_land(y, x)) {
+    return true;
+  }
+};
+
+mapgen_blob.prototype.is_corner = function(y, x) {
+  return this.check_arr(this.tiles, y, x, [4, 5, 6, 7]);
+};
+
+mapgen_blob.prototype.is_type = function(y, x, type) {
+  return this.check_arr(this.tiles, y, x, [type]);
+};
+
+mapgen_blob.prototype.is_land = function(y, x) {
+  return this.check_arr(this.land, y, x, [1]);
+};
+
+mapgen_blob.prototype.check_arr = function(arr, y, x, checks) {
+  if (y < 0 || y >= arr.length || x < 0 || x >= arr[0].length) {
+    return false;
+  }
+  for (var i = 0; i < checks.length; i++) {
+    if (arr[y][x] == checks[i]) {
+      return true;
+    }
+  }
+};
+
+/* ========================================================================
+	Map Generator
+	Make Canvas
+ ========================================================================== */
+
+/* Set up a new canvas
+	---------------------------------------- */
+
+function mapgen_canvas(w, h) {
+  var obj = {};
+  if ("undefined" != typeof global) {
+    obj.canv = new canvas();
+  } else {
+    obj.canv = document.createElement("canvas");
+  }
+  obj.cont = obj.canv.getContext("2d");
+  obj.canv.width = w;
+  obj.canv.height = h;
+  obj.cont.fillStyle = "#fff";
+  obj.w = w;
+  obj.h = h;
+  return obj;
+}
+
+/* Draw a pattern to a canvas
+	---------------------------------------- */
+
+function mapgen_pattern(alpha, pattern) {
+  var canv = mapgen_canvas(alpha.width, alpha.height);
+  if (typeof pattern !== "string") {
+    pattern = canv.cont.createPattern(pattern, "repeat");
+  }
+  canv.cont.fillStyle = pattern;
+  canv.cont.fillRect(0, 0, alpha.width, alpha.height);
+  canv.cont.globalCompositeOperation = "destination-in";
+  canv.cont.drawImage(alpha, 0, 0);
+  canv.cont.globalCompositeOperation = "normal";
+
+  return canv;
+}
+
+/* ========================================================================
+	Map Generator
+	------------
+	Config:
+	w           // width of map
+	h           // height of map
+	crust       // thickness of outer crust on land
+	blobs       // initial blobs
+	center_blob // size of center blob of land, 0 for none
+	small_blobs // number of random small circles of land
+	large_blobs // number of random large circles of land
+	-----------
+ ========================================================================== */
+
+/* Server side only
+	---------------------------------------- */
+
+if ("undefined" != typeof global) {
+  var fs = require("fs");
+}
+
+/* New Map Generation
+	---------------------------------------- */
+
+function mapgen(img, config, scheme, map_img) {
+  this.size = 36;
+  this.img = img;
+  this.c = config;
+  this.scheme = scheme;
+
+  // choose type
+  if (this.scheme.type == "random") {
+    return this.draw_random();
+  }
+  if (this.scheme.type == "image") {
+    return this.draw_image(map_img);
+  }
+}
+
+/* Draw image
+	---------------------------------------- */
+
+mapgen.prototype.draw_image = function(map_img) {
+  var fg = mapgen_canvas(
+    map_img.width + this.scheme.gap * 2,
+    map_img.height + this.scheme.gap * 2
+  );
+  fg.cont.drawImage(map_img, this.scheme.gap, this.scheme.gap);
+  var bg = mapgen_pattern(fg.canv, this.img.dirt);
+  return { fg: fg, bg: bg };
+};
+
+/* Draw random
+	---------------------------------------- */
+
+mapgen.prototype.draw_random = function() {
+  // setup
+  this.blobs = JSON.parse(JSON.stringify(this.scheme.blobs));
+  this.bg = mapgen_canvas(this.scheme.w, this.scheme.h);
+  this.fg = mapgen_canvas(this.scheme.w, this.scheme.h);
+
+  // generate some random large circles
+  for (var i = 0; i < this.scheme.large_blobs; i++) {
+    this.blobs = this.get_circle(this.blobs, 4, 6);
+  }
+
+  // generate some random small circles
+  for (var i = 0; i < this.scheme.small_blobs; i++) {
+    this.blobs = this.get_circle(this.blobs, 1, 3);
+  }
+
+  // go through each blob
+  for (var i = 0; i < this.blobs.length; i++) {
+    var blob = this.blobs[i];
+
+    // create the blobs
+    var bg = new mapgen_blob(this.img, this.c, false, blob.r + 4, blob.type);
+    var fg = new mapgen_blob(
+      this.img,
+      this.c,
+      this.scheme.decorations,
+      blob.r,
+      blob.type
+    );
+
+    // combine the backgrounds
+    var wh = fg.fg.canv.width;
+    var new_bg = mapgen_canvas(wh, wh);
+    new_bg.cont.drawImage(bg.fg.canv, wh * 0.1, wh * 0.1, wh * 0.8, wh * 0.8);
+    new_bg.cont.globalCompositeOperation = "source-atop";
+    new_bg.cont.fillStyle = "rgba(0,0,0,0.8)";
+    new_bg.cont.fillRect(0, 0, wh, wh);
+    new_bg.cont.globalCompositeOperation = "normal";
+    new_bg.cont.drawImage(fg.bg.canv, 0, 0);
+
+    // draw it to main canvas
+    this.bg.cont.drawImage(new_bg.canv, blob.x - wh / 2, blob.y - wh / 2);
+    this.fg.cont.drawImage(fg.fg.canv, blob.x - wh / 2, blob.y - wh / 2);
+  }
+
+  // return it
+  return {
+    bg: this.bg,
+    fg: this.fg
+  };
+};
+
+/* Get a far away circle
+	---------------------------------------- */
+
+mapgen.prototype.get_circle = function(arr, min_radius, max_radius) {
+  // generate many circles and find furthest away
+  var distance = 0;
+  var circle = null;
+
+  for (var i = 0; i < 20; i++) {
+    // make new circle
+    var test_circle = this.circle(min_radius, max_radius);
+    var smallest_distance = 999999;
+
+    // find shortest distance from all other circles
+    for (var j = 0; j < arr.length; j++) {
+      var dx = arr[j].x - test_circle.x;
+      var dy = arr[j].y - test_circle.y;
+      var test_distance = Math.round(
+        Math.sqrt(Math.pow(dx, 2) + Math.pow(dy, 2))
+      );
+      smallest_distance =
+        test_distance < smallest_distance ? test_distance : smallest_distance;
+    }
+
+    // if is the largest distance record this as furthest
+    if (distance < smallest_distance) {
+      distance = smallest_distance;
+      circle = test_circle;
+    }
+  }
+
+  // add furthest away circle to new array
+  arr.push(circle);
+  return arr;
+};
+
+/* Generate a random circle
+	---------------------------------------- */
+
+mapgen.prototype.circle = function(min_radius, max_radius) {
+  var r = Math.floor(Math.random() * max_radius) + min_radius;
+  var gap = (r + 2) * this.size + this.scheme.gap;
+  var x = Math.floor(Math.random() * (this.scheme.w - gap * 2)) + gap;
+  var y = Math.floor(Math.random() * (this.scheme.h - gap * 2)) + gap;
+  return {
+    r: r,
+    x: x,
+    y: y
+  };
+};
+
 var config = config || {};
 config.animations = {
   "ant-body-hit": [
@@ -2096,469 +2710,6 @@ for (key in config.weapons) {
   });
 }
 
-function isMergeableObject(val) {
-  var nonNullObject = val && typeof val === "object";
-
-  return (
-    nonNullObject &&
-    Object.prototype.toString.call(val) !== "[object RegExp]" &&
-    Object.prototype.toString.call(val) !== "[object Date]"
-  );
-}
-
-function emptyTarget(val) {
-  return Array.isArray(val) ? [] : {};
-}
-
-function cloneIfNecessary(value, optionsArgument) {
-  var clone = optionsArgument && optionsArgument.clone === true;
-  return clone && isMergeableObject(value)
-    ? deepmerge(emptyTarget(value), value, optionsArgument)
-    : value;
-}
-
-function defaultArrayMerge(target, source, optionsArgument) {
-  var destination = target.slice();
-  source.forEach(function(e, i) {
-    if (typeof destination[i] === "undefined") {
-      destination[i] = cloneIfNecessary(e, optionsArgument);
-    } else if (isMergeableObject(e)) {
-      destination[i] = deepmerge(target[i], e, optionsArgument);
-    } else if (target.indexOf(e) === -1) {
-      destination.push(cloneIfNecessary(e, optionsArgument));
-    }
-  });
-  return destination;
-}
-
-function mergeObject(target, source, optionsArgument) {
-  var destination = {};
-  if (isMergeableObject(target)) {
-    Object.keys(target).forEach(function(key) {
-      destination[key] = cloneIfNecessary(target[key], optionsArgument);
-    });
-  }
-  Object.keys(source).forEach(function(key) {
-    if (!isMergeableObject(source[key]) || !target[key]) {
-      destination[key] = cloneIfNecessary(source[key], optionsArgument);
-    } else {
-      destination[key] = deepmerge(target[key], source[key], optionsArgument);
-    }
-  });
-  return destination;
-}
-
-function deepmerge(target, source, optionsArgument) {
-  var array = Array.isArray(source);
-  var options = optionsArgument || { arrayMerge: defaultArrayMerge };
-  var arrayMerge = options.arrayMerge || defaultArrayMerge;
-
-  if (array) {
-    return Array.isArray(target)
-      ? arrayMerge(target, source, optionsArgument)
-      : cloneIfNecessary(source, optionsArgument);
-  } else {
-    return mergeObject(target, source, optionsArgument);
-  }
-}
-
-deepmerge.all = function deepmergeAll(array, optionsArgument) {
-  if (!Array.isArray(array) || array.length < 2) {
-    throw new Error(
-      "first argument should be an array with at least two elements"
-    );
-  }
-
-  // we are sure there are at least 2 values, so it is safe to have no initial value
-  return array.reduce(function(prev, next) {
-    return deepmerge(prev, next, optionsArgument);
-  });
-};
-
-/* ========================================================================
-    Math Functions
- ========================================================================== */
-
-/* Shorten "Math" functions
-	---------------------------------------- */
-
-function cos(n) {
-  return Math.cos(n);
-}
-function sin(n) {
-  return Math.sin(n);
-}
-function pow(n) {
-  return Math.pow(n);
-}
-function abs(n) {
-  return Math.abs(n);
-}
-function sqr(n) {
-  return Math.pow(n, 2);
-}
-function sqrt(n) {
-  return Math.sqrt(n);
-}
-function round(n) {
-  return Math.round(n);
-}
-function floor(n) {
-  return Math.floor(n);
-}
-function ceil(n) {
-  return Math.ceil(n);
-}
-function atan2(n1, n2) {
-  return Math.atan2(n1, n2);
-}
-function min(n1, n2) {
-  return Math.min(n1, n2);
-}
-function max(n1, n2) {
-  return Math.max(n1, n2);
-}
-function rand(n1, n2) {
-  return floor(Math.random() * n2) + n1;
-}
-var pi = Math.PI;
-
-/* Fix number to decimal places
-	---------------------------------------- */
-
-Number.prototype.fixed = function(n) {
-  n = n || 2;
-  return parseFloat(this.toFixed(n));
-};
-
-/* Add preceding zeroes to number
-	---------------------------------------- */
-
-function preceding_zeroes(n, length) {
-  var length = length || 2;
-  var n = n.toString();
-  while (n.length < length) {
-    n = "0" + n;
-  }
-  return n;
-}
-
-/* Is number
-	---------------------------------------- */
-
-function is_numeric(n) {
-  return !isNaN(parseFloat(n)) && isFinite(n);
-}
-
-/* Get distance between two points
-	---------------------------------------- */
-
-function get_speed(sx, sy) {
-  return round(sqrt(sqr(sx) + sqr(sy)));
-}
-
-function get_distance(x1, y1, x2, y2) {
-  var dx = x2 - x1,
-    dy = y2 - y1;
-  return get_speed(dx, dy);
-}
-
-/* Check speed limit
-	---------------------------------------- */
-
-function check_speed(sx, sy, speed) {
-  var d = get_distance(0, 0, sx, sy),
-    ns = {
-      x: sx,
-      y: sy,
-      total: d
-    };
-  if (speed < d) {
-    var multi = speed / d;
-    ns.x = sx * multi;
-    ns.y = sy * multi;
-    ns.total = speed;
-  }
-  return ns;
-}
-
-/* Get Heading Angle From X and Y Speed
-	// 0 = left, 360 = left
-	---------------------------------------- */
-
-function get_angle(sx, sy) {
-  return (((atan2(sy, sx) * 180) / pi) % 360) + 180;
-}
-
-function get_heading(x1, y1, x2, y2) {
-  var xs = x2 - x1,
-    ys = y2 - y1;
-  return get_angle(xs, ys);
-}
-
-/* Get X and Y speed from heading and velocity
-	---------------------------------------- */
-
-function xy_speed(angle, speed) {
-  var a = angle_add(angle, 180),
-    r = (a / 180) * pi;
-  return {
-    x: speed * cos(r),
-    y: speed * sin(r)
-  };
-}
-
-/* Get X and Y offset from heading and velocity
-	---------------------------------------- */
-
-function xy_offset(angle, sx, sy) {
-  var xy1 = xy_speed(angle, sx);
-  var xy2 = xy_speed(angle_add(angle, 90), sy);
-  return {
-    x: xy1.x + xy2.x,
-    y: xy1.y + xy2.y
-  };
-}
-
-/* Get difference between two numbers in a loop
-	---------------------------------------- */
-
-function n_diff(current, target, bottom, top) {
-  if (current == target) {
-    return 0;
-  }
-
-  var scale = abs(top - bottom), // get total size of the loop
-    c_current = current - bottom, // correct current for negative numbers
-    c_target = target - bottom, // correct target for negative numbers
-    n1 = (c_target + scale - c_current) % scale, // get difference when adding
-    n2 = (c_current + scale - c_target) % scale; // get difference when subtracting
-
-  // return smallest distance
-  if (n1 < n2) {
-    return n1;
-  } else {
-    return -n2;
-  }
-}
-
-/* Auto loop a number
-	---------------------------------------- */
-
-function n_loop(n, bottom, top) {
-  var difference = abs(top - bottom);
-  while (n <= bottom) {
-    n += difference;
-  }
-  while (n > top) {
-    n -= difference;
-  }
-  return n;
-}
-
-/* Add to a number without overflowing up or down from min/max
-	---------------------------------------- */
-
-function n_add(n1, n2, t1, t2) {
-  var dif = abs(t2 - t1),
-    na = n1 + n2;
-  while (na < t1) {
-    na += dif;
-  }
-  while (na >= t2) {
-    na -= dif;
-  }
-  return na;
-}
-
-/* Add to an angle without overflowing up or down from 0-360
-	---------------------------------------- */
-
-function angle_add(angle, add) {
-  if (!angle) {
-    angle = 0;
-  }
-  return n_add(angle, add, 0, 360);
-}
-
-/* Move number towards a new number with loop
-	---------------------------------------- */
-
-function increment_num(current, target, bottom, top, speed) {
-  var diff = n_diff(current, target, bottom, top); // get shortest route to number
-  move = min(abs(diff) / 10, 4) * speed; // calculate how much to move
-
-  // if difference is less then movement, return target
-  if (abs(diff) < move) {
-    return target;
-  }
-
-  // add or subtract movement
-  move = diff < 0 ? -move : move;
-  return n_add(current, move, bottom, top);
-}
-
-/* Move angle towards a new angle
-	---------------------------------------- */
-
-function increment_angle(old_angle, new_angle, speed) {
-  return increment_num(old_angle, new_angle, 0, 360, speed);
-}
-
-/* If a point is within a circle
-	---------------------------------------- */
-
-function in_circle(x, y, cx, cy, radius) {
-  return get_distance(x, y, cx, cy) < radius;
-}
-
-/* Plot a course
-	---------------------------------------- */
-
-function plot_course(x, y, sx, sy, extend) {
-  // get initial speed
-  var extend = extend ? extend : 0,
-    speed = get_speed(sx, sy);
-
-  // if no distance then do nothing
-  if (speed == 0) {
-    return { move: false };
-  }
-
-  // calculate increments
-  var increment_x = sx / speed,
-    increment_y = sy / speed,
-    new_x = x - increment_x * extend,
-    new_y = y - increment_y * extend,
-    points = [{ x: new_x, y: new_y }];
-
-  // iterate through path and record points
-  for (var i = 0; i < speed + extend * 2; i++) {
-    (new_x += increment_x), (new_y += increment_y);
-    points.push({
-      x: new_x,
-      y: new_y
-    });
-  }
-
-  // return point array
-  return {
-    move: true,
-    points: points
-  };
-}
-
-/* translate co-ordinates by an angle
-	---------------------------------------- */
-
-function rotate_coords(x, y, cx, cy, angle) {
-  var r = (pi / 180) * angle;
-  return {
-    x: cos(r) * (x - cx) + sin(r) * (y - cy) + cx,
-    y: cos(r) * (y - cy) - sin(r) * (x - cx) + cy
-  };
-}
-
-/* ========================================================================
-    Misc Functions
- ========================================================================== */
-
-/* Duplicate object
-	---------------------------------------- */
-
-function duplicate_obj(obj) {
-  return JSON.parse(JSON.stringify(obj));
-}
-
-/* Prevent array merging
-	---------------------------------------- */
-
-function dont_merge(destination, source) {
-  if (!source) {
-    return destination;
-  } else {
-    return source;
-  }
-}
-
-/* Add space to a string
-	---------------------------------------- */
-
-function str_space(str) {
-  var new_str = "";
-  for (var i = 0; i < str.length; i++) {
-    var add = i == str.length - 1 ? "" : "\u200A";
-    new_str += str[i] + add;
-  }
-  return new_str;
-}
-
-/* Log multiple values
-	---------------------------------------- */
-
-function clog(
-  s1,
-  s2,
-  s3,
-  s4,
-  s5,
-  s6,
-  s7,
-  s8,
-  s9,
-  s10,
-  s11,
-  s12,
-  s13,
-  s14,
-  s15
-) {
-  var str = s1;
-  if (s2 != undefined) {
-    str += " | " + s2;
-  }
-  if (s3 != undefined) {
-    str += " | " + s3;
-  }
-  if (s4 != undefined) {
-    str += " | " + s4;
-  }
-  if (s5 != undefined) {
-    str += " | " + s5;
-  }
-  if (s6 != undefined) {
-    str += " | " + s6;
-  }
-  if (s7 != undefined) {
-    str += " | " + s7;
-  }
-  if (s8 != undefined) {
-    str += " | " + s8;
-  }
-  if (s9 != undefined) {
-    str += " | " + s9;
-  }
-  if (s10 != undefined) {
-    str += " | " + s10;
-  }
-  if (s11 != undefined) {
-    str += " | " + s11;
-  }
-  if (s12 != undefined) {
-    str += " | " + s12;
-  }
-  if (s13 != undefined) {
-    str += " | " + s13;
-  }
-  if (s14 != undefined) {
-    str += " | " + s14;
-  }
-  if (s15 != undefined) {
-    str += " | " + s15;
-  }
-  console.log(str);
-}
-
 /* ========================================================================
     Actions
  ========================================================================== */
@@ -4332,619 +4483,468 @@ core.prototype.unpack_explosion = function(state, str) {
   this.create_explosion(props, state);
 };
 
-/* ========================================================================
-	Map Generator
-	Blobs
- ========================================================================== */
+function isMergeableObject(val) {
+  var nonNullObject = val && typeof val === "object";
 
-/* Draw a blob
-	---------------------------------------- */
-
-function mapgen_blob(img, config, decorations, radius, type) {
-  this.size = 36;
-  this.img = img;
-  this.c = config;
-
-  // get land type
-  var type = type || Math.floor(Math.random() * this.c.land_type.length);
-  this.ref = this.c.land_type[type];
-
-  // set up main anchor points
-  var anchors = [];
-  var points = Math.floor(radius / 2) + 4;
-  var spike = Math.floor(radius / 2) + 2;
-  for (var p = 0; p < points; p++) {
-    var new_radius =
-      Math.max(radius - Math.floor(Math.random() * spike), 1) + 1;
-    var x =
-      radius + Math.floor(new_radius * Math.cos((2 * Math.PI * p) / points));
-    var y =
-      radius + Math.floor(new_radius * Math.sin((2 * Math.PI * p) / points));
-    anchors.push({ x: x, y: y });
-  }
-
-  // draw shape to canvas
-  var size = radius * 2 + 1;
-  var shape = mapgen_canvas(size, size);
-  this.draw_path(shape, anchors);
-
-  // build array of land or not tiles
-  var pixels = shape.cont.getImageData(0, 0, shape.w, shape.h);
-  this.land = [];
-  for (var y = 0; y < size; y++) {
-    this.land[y] = [];
-    for (var x = 0; x < size; x++) {
-      var i = (y * size + x) * 4 + 3;
-      this.land[y][x] = pixels.data[i] > 30 ? 1 : 0;
-    }
-  }
-
-  // build tile array and assign corners and land
-  this.tiles = [];
-  for (var y = 0; y < size; y++) {
-    this.tiles[y] = [];
-    for (var x = 0; x < size; x++) {
-      this.tiles[y][x] = this.set_corner_tile(y, x);
-    }
-  }
-
-  // assign pixels a tile value
-  for (var y = 0; y < size; y++) {
-    for (var x = 0; x < size; x++) {
-      this.tiles[y][x] =
-        this.tiles[y][x] === 12 ? this.set_land_tile(y, x) : this.tiles[y][x];
-    }
-  }
-
-  // draw them
-  var wh = (size + 4) * this.size;
-  this.alpha = mapgen_canvas(wh, wh);
-  this.edge = mapgen_canvas(wh, wh);
-  this.bg = mapgen_canvas(wh, wh);
-  for (var y = 0; y < size; y++) {
-    for (var x = 0; x < size; x++) {
-      var tile = this.tiles[y][x];
-      if (tile === -1) {
-        continue;
-      }
-
-      // draw it
-      var x1 = (x + 2) * this.size;
-      var y1 = (y + 2) * this.size;
-      this.draw_to_canvas(this.alpha.cont, x1, y1, tile, 0);
-      this.draw_to_canvas(this.edge.cont, x1, y1, tile, this.ref.edge);
-
-      if (decorations) {
-        this.draw_decoration(this.bg.cont, x, y, tile);
-      }
-    }
-  }
-
-  // draw rest of fg
-  var fg = mapgen_pattern(this.alpha.canv, this.img[this.ref.fg]);
-  fg.cont.drawImage(this.edge.canv, 0, 0);
-
-  // draw dirt bg
-  var fg_dirt = mapgen_pattern(fg.canv, this.img[this.ref.bg]);
-  this.bg.cont.drawImage(fg_dirt.canv, 0, 0);
-
-  // export
-  return {
-    fg: fg,
-    bg: this.bg
-  };
+  return (
+    nonNullObject &&
+    Object.prototype.toString.call(val) !== "[object RegExp]" &&
+    Object.prototype.toString.call(val) !== "[object Date]"
+  );
 }
 
-/* Draw an alpha path
-	---------------------------------------- */
+function emptyTarget(val) {
+  return Array.isArray(val) ? [] : {};
+}
 
-mapgen_blob.prototype.draw_path = function(canv, path) {
-  // start paths on canvases
-  canv.cont.beginPath();
-  canv.cont.moveTo(path[0].x, path[0].y);
+function cloneIfNecessary(value, optionsArgument) {
+  var clone = optionsArgument && optionsArgument.clone === true;
+  return clone && isMergeableObject(value)
+    ? deepmerge(emptyTarget(value), value, optionsArgument)
+    : value;
+}
 
-  // go through path
-  for (var i = 1; i < path.length - 1; i++) {
-    // get next point to curve around
-    var point1 = path[i],
-      point2 = path[i + 1],
-      qx,
-      qy;
+function defaultArrayMerge(target, source, optionsArgument) {
+  var destination = target.slice();
+  source.forEach(function(e, i) {
+    if (typeof destination[i] === "undefined") {
+      destination[i] = cloneIfNecessary(e, optionsArgument);
+    } else if (isMergeableObject(e)) {
+      destination[i] = deepmerge(target[i], e, optionsArgument);
+    } else if (target.indexOf(e) === -1) {
+      destination.push(cloneIfNecessary(e, optionsArgument));
+    }
+  });
+  return destination;
+}
 
-    // get curve values
-    if (i < path.length - 1) {
-      qx = (point1.x + point2.x) / 2;
-      qy = (point1.y + point2.y) / 2;
+function mergeObject(target, source, optionsArgument) {
+  var destination = {};
+  if (isMergeableObject(target)) {
+    Object.keys(target).forEach(function(key) {
+      destination[key] = cloneIfNecessary(target[key], optionsArgument);
+    });
+  }
+  Object.keys(source).forEach(function(key) {
+    if (!isMergeableObject(source[key]) || !target[key]) {
+      destination[key] = cloneIfNecessary(source[key], optionsArgument);
     } else {
-      qx = point2.x;
-      qy = point2.y;
+      destination[key] = deepmerge(target[key], source[key], optionsArgument);
     }
+  });
+  return destination;
+}
 
-    // draw curve to path
-    canv.cont.quadraticCurveTo(point1.x, point1.y, qx, qy);
-  }
+function deepmerge(target, source, optionsArgument) {
+  var array = Array.isArray(source);
+  var options = optionsArgument || { arrayMerge: defaultArrayMerge };
+  var arrayMerge = options.arrayMerge || defaultArrayMerge;
 
-  // rejoin the beginning of the path and fill
-  canv.cont.lineTo(path[0].x, path[0].y);
-  canv.cont.fill();
-};
-
-/* Draw a decoration
-	---------------------------------------- */
-
-mapgen_blob.prototype.draw_decoration = function(cont, x, y, tile) {
-  // are we drawing one
-  if (tile > 7 || Math.floor(Math.random() * 2) !== 0) {
-    return;
-  }
-
-  // can we do doubles
-  var double = false;
-  if (tile === 0 && this.is_type(y, x + 1, 0)) {
-    double = true;
-  }
-  if (tile === 1 && this.is_type(y, x - 1, 1)) {
-    double = true;
-  }
-  if (tile === 2 && this.is_type(y - 1, x, 2)) {
-    double = true;
-  }
-  if (tile === 3 && this.is_type(y + 1, x, 3)) {
-    double = true;
-  }
-  if (tile === 4 && this.is_type(y - 1, x + 1, 4)) {
-    double = true;
-  }
-  if (tile === 5 && this.is_type(y + 1, x + 1, 5)) {
-    double = true;
-  }
-  if (tile === 6 && this.is_type(y - 1, x - 1, 6)) {
-    double = true;
-  }
-  if (tile === 7 && this.is_type(y + 1, x - 1, 7)) {
-    double = true;
-  }
-
-  // choose source
-  var source = this.ref.decorations[1];
-  if (double && Math.floor(Math.random() * 2) === 0) {
-    source = this.ref.decorations[2];
+  if (array) {
+    return Array.isArray(target)
+      ? arrayMerge(target, source, optionsArgument)
+      : cloneIfNecessary(source, optionsArgument);
   } else {
-    double = false;
-  }
-
-  // choose decoration
-  var i = Math.floor(Math.random() * source.length);
-  var ref = source[i];
-
-  // get position to draw it
-  var half = this.size / 2;
-  var x1 = (x + 2) * this.size;
-  var y1 = (y + 2) * this.size;
-  var angle = 0;
-  if (tile === 1) {
-    x1 += this.size;
-    y1 += this.size;
-    angle = 180;
-  }
-  if (tile === 2) {
-    y1 += this.size;
-    angle = 270;
-  }
-  if (tile === 3) {
-    x1 += this.size;
-    angle = 90;
-  }
-  if (tile === 4) {
-    y1 += this.size;
-    angle = 315;
-  }
-  if (tile === 5) {
-    angle = 45;
-  }
-  if (tile === 6) {
-    x1 += this.size;
-    y1 += this.size;
-    angle = 225;
-  }
-  if (tile === 7) {
-    x1 += this.size;
-    angle = 135;
-  }
-
-  // draw that shit
-  var x_add = double ? this.size : 0;
-  cont.save();
-  cont.translate(x1, y1);
-  cont.rotate((angle * Math.PI) / 180);
-  cont.drawImage(
-    this.img.decorations,
-    ref.x,
-    ref.y,
-    ref.w,
-    ref.h,
-    0,
-    -ref.h + 5,
-    ref.w,
-    ref.h
-  );
-  cont.translate(-x1, -y1);
-  cont.restore();
-};
-
-/* Draw a tile to a canvas
-	---------------------------------------- */
-
-mapgen_blob.prototype.draw_to_canvas = function(cont, x, y, tile, key) {
-  var ts = this.size;
-  cont.save();
-  cont.translate(x, y);
-  cont.drawImage(this.img.edge, tile * ts, key * ts, ts, ts, 0, 0, ts, ts);
-  cont.translate(-y, -y);
-  cont.restore();
-};
-
-/* Get corner and land tiles
-	---------------------------------------- */
-
-mapgen_blob.prototype.set_corner_tile = function(y, x) {
-  var tile = -1;
-
-  //land
-  if (this.is_land(y, x)) {
-    tile = 12;
-
-    // not land
-  } else {
-    // corners
-    if (
-      !this.is_land(y - 1, x) &&
-      !this.is_land(y, x - 1) &&
-      this.is_land(y + 1, x) &&
-      this.is_land(y, x + 1)
-    ) {
-      tile = 4;
-    } else if (
-      !this.is_land(y - 1, x) &&
-      this.is_land(y, x - 1) &&
-      this.is_land(y + 1, x) &&
-      !this.is_land(y, x + 1)
-    ) {
-      tile = 5;
-    } else if (
-      this.is_land(y - 1, x) &&
-      !this.is_land(y, x - 1) &&
-      !this.is_land(y + 1, x) &&
-      this.is_land(y, x + 1)
-    ) {
-      tile = 6;
-    } else if (
-      this.is_land(y - 1, x) &&
-      this.is_land(y, x - 1) &&
-      !this.is_land(y + 1, x) &&
-      !this.is_land(y, x + 1)
-    ) {
-      tile = 7;
-    }
-  }
-
-  return tile;
-};
-
-/* Set land tile types
-	---------------------------------------- */
-
-mapgen_blob.prototype.set_land_tile = function(y, x) {
-  var tile = 12;
-
-  // corners
-  if (
-    !this.is_land(y - 1, x) &&
-    !this.is_land(y, x - 1) &&
-    this.is_land_or_corner(y + 1, x) &&
-    this.is_land_or_corner(y, x + 1) &&
-    !this.is_corner(y, x - 1) &&
-    !this.is_corner(y - 1, x)
-  ) {
-    tile = 4;
-  } else if (
-    !this.is_land(y - 1, x) &&
-    !this.is_land(y, x + 1) &&
-    this.is_land_or_corner(y, x - 1) &&
-    this.is_land_or_corner(y + 1, x) &&
-    !this.is_corner(y, x + 1) &&
-    !this.is_corner(y - 1, x)
-  ) {
-    tile = 5;
-  } else if (
-    !this.is_land(y, x - 1) &&
-    !this.is_land(y + 1, x) &&
-    this.is_land_or_corner(y - 1, x) &&
-    this.is_land_or_corner(y, x + 1) &&
-    !this.is_corner(y, x - 1) &&
-    !this.is_corner(y + 1, x)
-  ) {
-    tile = 6;
-  } else if (
-    !this.is_land(y + 1, x) &&
-    !this.is_land(y, x + 1) &&
-    this.is_land_or_corner(y - 1, x) &&
-    this.is_land_or_corner(y, x - 1) &&
-    !this.is_corner(y, x + 1) &&
-    !this.is_corner(y + 1, x)
-  ) {
-    tile = 7;
-
-    // flat edges
-  } else if (
-    !this.is_land(y - 1, x) &&
-    this.is_land(y + 1, x) &&
-    !this.is_corner(y - 1, x)
-  ) {
-    tile = 0;
-  } else if (
-    !this.is_land(y + 1, x) &&
-    this.is_land(y - 1, x) &&
-    !this.is_corner(y + 1, x)
-  ) {
-    tile = 1;
-  } else if (
-    !this.is_land(y, x - 1) &&
-    this.is_land(y, x + 1) &&
-    !this.is_corner(y, x - 1)
-  ) {
-    tile = 2;
-  } else if (
-    !this.is_land(y, x + 1) &&
-    this.is_land(y, x - 1) &&
-    !this.is_corner(y, x + 1)
-  ) {
-    tile = 3;
-
-    // inside corners
-  } else if (this.is_type(y + 1, x, 7) || this.is_type(y, x + 1, 7)) {
-    tile = 8;
-  } else if (this.is_type(y + 1, x, 6) || this.is_type(y, x - 1, 6)) {
-    tile = 9;
-  } else if (this.is_type(y - 1, x, 5) || this.is_type(y, x + 1, 5)) {
-    tile = 10;
-  } else if (this.is_type(y - 1, x, 4) || this.is_type(y, x - 1, 4)) {
-    tile = 11;
-  }
-
-  return tile;
-};
-
-/* Check arrays for values
-	---------------------------------------- */
-
-mapgen_blob.prototype.is_land_or_corner = function(y, x) {
-  if (this.is_corner(y, x) || this.is_land(y, x)) {
-    return true;
-  }
-};
-
-mapgen_blob.prototype.is_corner = function(y, x) {
-  return this.check_arr(this.tiles, y, x, [4, 5, 6, 7]);
-};
-
-mapgen_blob.prototype.is_type = function(y, x, type) {
-  return this.check_arr(this.tiles, y, x, [type]);
-};
-
-mapgen_blob.prototype.is_land = function(y, x) {
-  return this.check_arr(this.land, y, x, [1]);
-};
-
-mapgen_blob.prototype.check_arr = function(arr, y, x, checks) {
-  if (y < 0 || y >= arr.length || x < 0 || x >= arr[0].length) {
-    return false;
-  }
-  for (var i = 0; i < checks.length; i++) {
-    if (arr[y][x] == checks[i]) {
-      return true;
-    }
-  }
-};
-
-/* ========================================================================
-	Map Generator
-	Make Canvas
- ========================================================================== */
-
-/* Set up a new canvas
-	---------------------------------------- */
-
-function mapgen_canvas(w, h) {
-  var obj = {};
-  if ("undefined" != typeof global) {
-    obj.canv = new canvas();
-  } else {
-    obj.canv = document.createElement("canvas");
-  }
-  obj.cont = obj.canv.getContext("2d");
-  obj.canv.width = w;
-  obj.canv.height = h;
-  obj.cont.fillStyle = "#fff";
-  obj.w = w;
-  obj.h = h;
-  return obj;
-}
-
-/* Draw a pattern to a canvas
-	---------------------------------------- */
-
-function mapgen_pattern(alpha, pattern) {
-  var canv = mapgen_canvas(alpha.width, alpha.height);
-  if (typeof pattern !== "string") {
-    pattern = canv.cont.createPattern(pattern, "repeat");
-  }
-  canv.cont.fillStyle = pattern;
-  canv.cont.fillRect(0, 0, alpha.width, alpha.height);
-  canv.cont.globalCompositeOperation = "destination-in";
-  canv.cont.drawImage(alpha, 0, 0);
-  canv.cont.globalCompositeOperation = "normal";
-
-  return canv;
-}
-
-/* ========================================================================
-	Map Generator
-	------------
-	Config:
-	w           // width of map
-	h           // height of map
-	crust       // thickness of outer crust on land
-	blobs       // initial blobs
-	center_blob // size of center blob of land, 0 for none
-	small_blobs // number of random small circles of land
-	large_blobs // number of random large circles of land
-	-----------
- ========================================================================== */
-
-/* Server side only
-	---------------------------------------- */
-
-if ("undefined" != typeof global) {
-  var fs = require("fs");
-}
-
-/* New Map Generation
-	---------------------------------------- */
-
-function mapgen(img, config, scheme, map_img) {
-  this.size = 36;
-  this.img = img;
-  this.c = config;
-  this.scheme = scheme;
-
-  // choose type
-  if (this.scheme.type == "random") {
-    return this.draw_random();
-  }
-  if (this.scheme.type == "image") {
-    return this.draw_image(map_img);
+    return mergeObject(target, source, optionsArgument);
   }
 }
 
-/* Draw image
-	---------------------------------------- */
-
-mapgen.prototype.draw_image = function(map_img) {
-  var fg = mapgen_canvas(
-    map_img.width + this.scheme.gap * 2,
-    map_img.height + this.scheme.gap * 2
-  );
-  fg.cont.drawImage(map_img, this.scheme.gap, this.scheme.gap);
-  var bg = mapgen_pattern(fg.canv, this.img.dirt);
-  return { fg: fg, bg: bg };
-};
-
-/* Draw random
-	---------------------------------------- */
-
-mapgen.prototype.draw_random = function() {
-  // setup
-  this.blobs = JSON.parse(JSON.stringify(this.scheme.blobs));
-  this.bg = mapgen_canvas(this.scheme.w, this.scheme.h);
-  this.fg = mapgen_canvas(this.scheme.w, this.scheme.h);
-
-  // generate some random large circles
-  for (var i = 0; i < this.scheme.large_blobs; i++) {
-    this.blobs = this.get_circle(this.blobs, 4, 6);
-  }
-
-  // generate some random small circles
-  for (var i = 0; i < this.scheme.small_blobs; i++) {
-    this.blobs = this.get_circle(this.blobs, 1, 3);
-  }
-
-  // go through each blob
-  for (var i = 0; i < this.blobs.length; i++) {
-    var blob = this.blobs[i];
-
-    // create the blobs
-    var bg = new mapgen_blob(this.img, this.c, false, blob.r + 4, blob.type);
-    var fg = new mapgen_blob(
-      this.img,
-      this.c,
-      this.scheme.decorations,
-      blob.r,
-      blob.type
+deepmerge.all = function deepmergeAll(array, optionsArgument) {
+  if (!Array.isArray(array) || array.length < 2) {
+    throw new Error(
+      "first argument should be an array with at least two elements"
     );
-
-    // combine the backgrounds
-    var wh = fg.fg.canv.width;
-    var new_bg = mapgen_canvas(wh, wh);
-    new_bg.cont.drawImage(bg.fg.canv, wh * 0.1, wh * 0.1, wh * 0.8, wh * 0.8);
-    new_bg.cont.globalCompositeOperation = "source-atop";
-    new_bg.cont.fillStyle = "rgba(0,0,0,0.8)";
-    new_bg.cont.fillRect(0, 0, wh, wh);
-    new_bg.cont.globalCompositeOperation = "normal";
-    new_bg.cont.drawImage(fg.bg.canv, 0, 0);
-
-    // draw it to main canvas
-    this.bg.cont.drawImage(new_bg.canv, blob.x - wh / 2, blob.y - wh / 2);
-    this.fg.cont.drawImage(fg.fg.canv, blob.x - wh / 2, blob.y - wh / 2);
   }
 
-  // return it
-  return {
-    bg: this.bg,
-    fg: this.fg
-  };
+  // we are sure there are at least 2 values, so it is safe to have no initial value
+  return array.reduce(function(prev, next) {
+    return deepmerge(prev, next, optionsArgument);
+  });
 };
 
-/* Get a far away circle
+/* ========================================================================
+    Math Functions
+ ========================================================================== */
+
+/* Shorten "Math" functions
 	---------------------------------------- */
 
-mapgen.prototype.get_circle = function(arr, min_radius, max_radius) {
-  // generate many circles and find furthest away
-  var distance = 0;
-  var circle = null;
+function cos(n) {
+  return Math.cos(n);
+}
+function sin(n) {
+  return Math.sin(n);
+}
+function pow(n) {
+  return Math.pow(n);
+}
+function abs(n) {
+  return Math.abs(n);
+}
+function sqr(n) {
+  return Math.pow(n, 2);
+}
+function sqrt(n) {
+  return Math.sqrt(n);
+}
+function round(n) {
+  return Math.round(n);
+}
+function floor(n) {
+  return Math.floor(n);
+}
+function ceil(n) {
+  return Math.ceil(n);
+}
+function atan2(n1, n2) {
+  return Math.atan2(n1, n2);
+}
+function min(n1, n2) {
+  return Math.min(n1, n2);
+}
+function max(n1, n2) {
+  return Math.max(n1, n2);
+}
+function rand(n1, n2) {
+  return floor(Math.random() * n2) + n1;
+}
+var pi = Math.PI;
 
-  for (var i = 0; i < 20; i++) {
-    // make new circle
-    var test_circle = this.circle(min_radius, max_radius);
-    var smallest_distance = 999999;
+/* Fix number to decimal places
+	---------------------------------------- */
 
-    // find shortest distance from all other circles
-    for (var j = 0; j < arr.length; j++) {
-      var dx = arr[j].x - test_circle.x;
-      var dy = arr[j].y - test_circle.y;
-      var test_distance = Math.round(
-        Math.sqrt(Math.pow(dx, 2) + Math.pow(dy, 2))
-      );
-      smallest_distance =
-        test_distance < smallest_distance ? test_distance : smallest_distance;
-    }
+Number.prototype.fixed = function(n) {
+  n = n || 2;
+  return parseFloat(this.toFixed(n));
+};
 
-    // if is the largest distance record this as furthest
-    if (distance < smallest_distance) {
-      distance = smallest_distance;
-      circle = test_circle;
-    }
+/* Add preceding zeroes to number
+	---------------------------------------- */
+
+function preceding_zeroes(n, length) {
+  var length = length || 2;
+  var n = n.toString();
+  while (n.length < length) {
+    n = "0" + n;
+  }
+  return n;
+}
+
+/* Is number
+	---------------------------------------- */
+
+function is_numeric(n) {
+  return !isNaN(parseFloat(n)) && isFinite(n);
+}
+
+/* Get distance between two points
+	---------------------------------------- */
+
+function get_speed(sx, sy) {
+  return round(sqrt(sqr(sx) + sqr(sy)));
+}
+
+function get_distance(x1, y1, x2, y2) {
+  var dx = x2 - x1,
+    dy = y2 - y1;
+  return get_speed(dx, dy);
+}
+
+/* Check speed limit
+	---------------------------------------- */
+
+function check_speed(sx, sy, speed) {
+  var d = get_distance(0, 0, sx, sy),
+    ns = {
+      x: sx,
+      y: sy,
+      total: d
+    };
+  if (speed < d) {
+    var multi = speed / d;
+    ns.x = sx * multi;
+    ns.y = sy * multi;
+    ns.total = speed;
+  }
+  return ns;
+}
+
+/* Get Heading Angle From X and Y Speed
+	// 0 = left, 360 = left
+	---------------------------------------- */
+
+function get_angle(sx, sy) {
+  return (((atan2(sy, sx) * 180) / pi) % 360) + 180;
+}
+
+function get_heading(x1, y1, x2, y2) {
+  var xs = x2 - x1,
+    ys = y2 - y1;
+  return get_angle(xs, ys);
+}
+
+/* Get X and Y speed from heading and velocity
+	---------------------------------------- */
+
+function xy_speed(angle, speed) {
+  var a = angle_add(angle, 180),
+    r = (a / 180) * pi;
+  return {
+    x: speed * cos(r),
+    y: speed * sin(r)
+  };
+}
+
+/* Get X and Y offset from heading and velocity
+	---------------------------------------- */
+
+function xy_offset(angle, sx, sy) {
+  var xy1 = xy_speed(angle, sx);
+  var xy2 = xy_speed(angle_add(angle, 90), sy);
+  return {
+    x: xy1.x + xy2.x,
+    y: xy1.y + xy2.y
+  };
+}
+
+/* Get difference between two numbers in a loop
+	---------------------------------------- */
+
+function n_diff(current, target, bottom, top) {
+  if (current == target) {
+    return 0;
   }
 
-  // add furthest away circle to new array
-  arr.push(circle);
-  return arr;
-};
+  var scale = abs(top - bottom), // get total size of the loop
+    c_current = current - bottom, // correct current for negative numbers
+    c_target = target - bottom, // correct target for negative numbers
+    n1 = (c_target + scale - c_current) % scale, // get difference when adding
+    n2 = (c_current + scale - c_target) % scale; // get difference when subtracting
 
-/* Generate a random circle
+  // return smallest distance
+  if (n1 < n2) {
+    return n1;
+  } else {
+    return -n2;
+  }
+}
+
+/* Auto loop a number
 	---------------------------------------- */
 
-mapgen.prototype.circle = function(min_radius, max_radius) {
-  var r = Math.floor(Math.random() * max_radius) + min_radius;
-  var gap = (r + 2) * this.size + this.scheme.gap;
-  var x = Math.floor(Math.random() * (this.scheme.w - gap * 2)) + gap;
-  var y = Math.floor(Math.random() * (this.scheme.h - gap * 2)) + gap;
+function n_loop(n, bottom, top) {
+  var difference = abs(top - bottom);
+  while (n <= bottom) {
+    n += difference;
+  }
+  while (n > top) {
+    n -= difference;
+  }
+  return n;
+}
+
+/* Add to a number without overflowing up or down from min/max
+	---------------------------------------- */
+
+function n_add(n1, n2, t1, t2) {
+  var dif = abs(t2 - t1),
+    na = n1 + n2;
+  while (na < t1) {
+    na += dif;
+  }
+  while (na >= t2) {
+    na -= dif;
+  }
+  return na;
+}
+
+/* Add to an angle without overflowing up or down from 0-360
+	---------------------------------------- */
+
+function angle_add(angle, add) {
+  if (!angle) {
+    angle = 0;
+  }
+  return n_add(angle, add, 0, 360);
+}
+
+/* Move number towards a new number with loop
+	---------------------------------------- */
+
+function increment_num(current, target, bottom, top, speed) {
+  var diff = n_diff(current, target, bottom, top); // get shortest route to number
+  move = min(abs(diff) / 10, 4) * speed; // calculate how much to move
+
+  // if difference is less then movement, return target
+  if (abs(diff) < move) {
+    return target;
+  }
+
+  // add or subtract movement
+  move = diff < 0 ? -move : move;
+  return n_add(current, move, bottom, top);
+}
+
+/* Move angle towards a new angle
+	---------------------------------------- */
+
+function increment_angle(old_angle, new_angle, speed) {
+  return increment_num(old_angle, new_angle, 0, 360, speed);
+}
+
+/* If a point is within a circle
+	---------------------------------------- */
+
+function in_circle(x, y, cx, cy, radius) {
+  return get_distance(x, y, cx, cy) < radius;
+}
+
+/* Plot a course
+	---------------------------------------- */
+
+function plot_course(x, y, sx, sy, extend) {
+  // get initial speed
+  var extend = extend ? extend : 0,
+    speed = get_speed(sx, sy);
+
+  // if no distance then do nothing
+  if (speed == 0) {
+    return { move: false };
+  }
+
+  // calculate increments
+  var increment_x = sx / speed,
+    increment_y = sy / speed,
+    new_x = x - increment_x * extend,
+    new_y = y - increment_y * extend,
+    points = [{ x: new_x, y: new_y }];
+
+  // iterate through path and record points
+  for (var i = 0; i < speed + extend * 2; i++) {
+    (new_x += increment_x), (new_y += increment_y);
+    points.push({
+      x: new_x,
+      y: new_y
+    });
+  }
+
+  // return point array
   return {
-    r: r,
-    x: x,
-    y: y
+    move: true,
+    points: points
   };
-};
+}
+
+/* translate co-ordinates by an angle
+	---------------------------------------- */
+
+function rotate_coords(x, y, cx, cy, angle) {
+  var r = (pi / 180) * angle;
+  return {
+    x: cos(r) * (x - cx) + sin(r) * (y - cy) + cx,
+    y: cos(r) * (y - cy) - sin(r) * (x - cx) + cy
+  };
+}
+
+/* ========================================================================
+    Misc Functions
+ ========================================================================== */
+
+/* Duplicate object
+	---------------------------------------- */
+
+function duplicate_obj(obj) {
+  return JSON.parse(JSON.stringify(obj));
+}
+
+/* Prevent array merging
+	---------------------------------------- */
+
+function dont_merge(destination, source) {
+  if (!source) {
+    return destination;
+  } else {
+    return source;
+  }
+}
+
+/* Add space to a string
+	---------------------------------------- */
+
+function str_space(str) {
+  var new_str = "";
+  for (var i = 0; i < str.length; i++) {
+    var add = i == str.length - 1 ? "" : "\u200A";
+    new_str += str[i] + add;
+  }
+  return new_str;
+}
+
+/* Log multiple values
+	---------------------------------------- */
+
+function clog(
+  s1,
+  s2,
+  s3,
+  s4,
+  s5,
+  s6,
+  s7,
+  s8,
+  s9,
+  s10,
+  s11,
+  s12,
+  s13,
+  s14,
+  s15
+) {
+  var str = s1;
+  if (s2 != undefined) {
+    str += " | " + s2;
+  }
+  if (s3 != undefined) {
+    str += " | " + s3;
+  }
+  if (s4 != undefined) {
+    str += " | " + s4;
+  }
+  if (s5 != undefined) {
+    str += " | " + s5;
+  }
+  if (s6 != undefined) {
+    str += " | " + s6;
+  }
+  if (s7 != undefined) {
+    str += " | " + s7;
+  }
+  if (s8 != undefined) {
+    str += " | " + s8;
+  }
+  if (s9 != undefined) {
+    str += " | " + s9;
+  }
+  if (s10 != undefined) {
+    str += " | " + s10;
+  }
+  if (s11 != undefined) {
+    str += " | " + s11;
+  }
+  if (s12 != undefined) {
+    str += " | " + s12;
+  }
+  if (s13 != undefined) {
+    str += " | " + s13;
+  }
+  if (s14 != undefined) {
+    str += " | " + s14;
+  }
+  if (s15 != undefined) {
+    str += " | " + s15;
+  }
+  console.log(str);
+}
 
 var schemes = schemes || {};
 schemes.deathmatch = {
