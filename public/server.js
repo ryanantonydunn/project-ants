@@ -1,615 +1,2237 @@
+function isMergeableObject(val) {
+  var nonNullObject = val && typeof val === "object";
+
+  return (
+    nonNullObject &&
+    Object.prototype.toString.call(val) !== "[object RegExp]" &&
+    Object.prototype.toString.call(val) !== "[object Date]"
+  );
+}
+
+function emptyTarget(val) {
+  return Array.isArray(val) ? [] : {};
+}
+
+function cloneIfNecessary(value, optionsArgument) {
+  var clone = optionsArgument && optionsArgument.clone === true;
+  return clone && isMergeableObject(value)
+    ? deepmerge(emptyTarget(value), value, optionsArgument)
+    : value;
+}
+
+function defaultArrayMerge(target, source, optionsArgument) {
+  var destination = target.slice();
+  source.forEach(function(e, i) {
+    if (typeof destination[i] === "undefined") {
+      destination[i] = cloneIfNecessary(e, optionsArgument);
+    } else if (isMergeableObject(e)) {
+      destination[i] = deepmerge(target[i], e, optionsArgument);
+    } else if (target.indexOf(e) === -1) {
+      destination.push(cloneIfNecessary(e, optionsArgument));
+    }
+  });
+  return destination;
+}
+
+function mergeObject(target, source, optionsArgument) {
+  var destination = {};
+  if (isMergeableObject(target)) {
+    Object.keys(target).forEach(function(key) {
+      destination[key] = cloneIfNecessary(target[key], optionsArgument);
+    });
+  }
+  Object.keys(source).forEach(function(key) {
+    if (!isMergeableObject(source[key]) || !target[key]) {
+      destination[key] = cloneIfNecessary(source[key], optionsArgument);
+    } else {
+      destination[key] = deepmerge(target[key], source[key], optionsArgument);
+    }
+  });
+  return destination;
+}
+
+function deepmerge(target, source, optionsArgument) {
+  var array = Array.isArray(source);
+  var options = optionsArgument || { arrayMerge: defaultArrayMerge };
+  var arrayMerge = options.arrayMerge || defaultArrayMerge;
+
+  if (array) {
+    return Array.isArray(target)
+      ? arrayMerge(target, source, optionsArgument)
+      : cloneIfNecessary(source, optionsArgument);
+  } else {
+    return mergeObject(target, source, optionsArgument);
+  }
+}
+
+deepmerge.all = function deepmergeAll(array, optionsArgument) {
+  if (!Array.isArray(array) || array.length < 2) {
+    throw new Error(
+      "first argument should be an array with at least two elements"
+    );
+  }
+
+  // we are sure there are at least 2 values, so it is safe to have no initial value
+  return array.reduce(function(prev, next) {
+    return deepmerge(prev, next, optionsArgument);
+  });
+};
+
 /* ========================================================================
-	Map Generator
-	Blobs
+    Math Functions
  ========================================================================== */
 
-/* Draw a blob
+/* Shorten "Math" functions
 	---------------------------------------- */
 
-function mapgen_blob(img, config, decorations, radius, type) {
-  this.size = 36;
-  this.img = img;
-  this.c = config;
+function cos(n) {
+  return Math.cos(n);
+}
+function sin(n) {
+  return Math.sin(n);
+}
+function pow(n) {
+  return Math.pow(n);
+}
+function abs(n) {
+  return Math.abs(n);
+}
+function sqr(n) {
+  return Math.pow(n, 2);
+}
+function sqrt(n) {
+  return Math.sqrt(n);
+}
+function round(n) {
+  return Math.round(n);
+}
+function floor(n) {
+  return Math.floor(n);
+}
+function ceil(n) {
+  return Math.ceil(n);
+}
+function atan2(n1, n2) {
+  return Math.atan2(n1, n2);
+}
+function min(n1, n2) {
+  return Math.min(n1, n2);
+}
+function max(n1, n2) {
+  return Math.max(n1, n2);
+}
+function rand(n1, n2) {
+  return floor(Math.random() * n2) + n1;
+}
+var pi = Math.PI;
 
-  // get land type
-  var type = type || Math.floor(Math.random() * this.c.land_type.length);
-  this.ref = this.c.land_type[type];
+/* Fix number to decimal places
+	---------------------------------------- */
 
-  // set up main anchor points
-  var anchors = [];
-  var points = Math.floor(radius / 2) + 4;
-  var spike = Math.floor(radius / 2) + 2;
-  for (var p = 0; p < points; p++) {
-    var new_radius =
-      Math.max(radius - Math.floor(Math.random() * spike), 1) + 1;
-    var x =
-      radius + Math.floor(new_radius * Math.cos((2 * Math.PI * p) / points));
-    var y =
-      radius + Math.floor(new_radius * Math.sin((2 * Math.PI * p) / points));
-    anchors.push({ x: x, y: y });
+Number.prototype.fixed = function(n) {
+  n = n || 2;
+  return parseFloat(this.toFixed(n));
+};
+
+/* Add preceding zeroes to number
+	---------------------------------------- */
+
+function preceding_zeroes(n, length) {
+  var length = length || 2;
+  var n = n.toString();
+  while (n.length < length) {
+    n = "0" + n;
   }
+  return n;
+}
 
-  // draw shape to canvas
-  var size = radius * 2 + 1;
-  var shape = mapgen_canvas(size, size);
-  this.draw_path(shape, anchors);
+/* Is number
+	---------------------------------------- */
 
-  // build array of land or not tiles
-  var pixels = shape.cont.getImageData(0, 0, shape.w, shape.h);
-  this.land = [];
-  for (var y = 0; y < size; y++) {
-    this.land[y] = [];
-    for (var x = 0; x < size; x++) {
-      var i = (y * size + x) * 4 + 3;
-      this.land[y][x] = pixels.data[i] > 30 ? 1 : 0;
-    }
+function is_numeric(n) {
+  return !isNaN(parseFloat(n)) && isFinite(n);
+}
+
+/* Get distance between two points
+	---------------------------------------- */
+
+function get_speed(sx, sy) {
+  return round(sqrt(sqr(sx) + sqr(sy)));
+}
+
+function get_distance(x1, y1, x2, y2) {
+  var dx = x2 - x1,
+    dy = y2 - y1;
+  return get_speed(dx, dy);
+}
+
+/* Check speed limit
+	---------------------------------------- */
+
+function check_speed(sx, sy, speed) {
+  var d = get_distance(0, 0, sx, sy),
+    ns = {
+      x: sx,
+      y: sy,
+      total: d
+    };
+  if (speed < d) {
+    var multi = speed / d;
+    ns.x = sx * multi;
+    ns.y = sy * multi;
+    ns.total = speed;
   }
+  return ns;
+}
 
-  // build tile array and assign corners and land
-  this.tiles = [];
-  for (var y = 0; y < size; y++) {
-    this.tiles[y] = [];
-    for (var x = 0; x < size; x++) {
-      this.tiles[y][x] = this.set_corner_tile(y, x);
-    }
-  }
+/* Get Heading Angle From X and Y Speed
+	// 0 = left, 360 = left
+	---------------------------------------- */
 
-  // assign pixels a tile value
-  for (var y = 0; y < size; y++) {
-    for (var x = 0; x < size; x++) {
-      this.tiles[y][x] =
-        this.tiles[y][x] === 12 ? this.set_land_tile(y, x) : this.tiles[y][x];
-    }
-  }
+function get_angle(sx, sy) {
+  return (((atan2(sy, sx) * 180) / pi) % 360) + 180;
+}
 
-  // draw them
-  var wh = (size + 4) * this.size;
-  this.alpha = mapgen_canvas(wh, wh);
-  this.edge = mapgen_canvas(wh, wh);
-  this.bg = mapgen_canvas(wh, wh);
-  for (var y = 0; y < size; y++) {
-    for (var x = 0; x < size; x++) {
-      var tile = this.tiles[y][x];
-      if (tile === -1) {
-        continue;
-      }
+function get_heading(x1, y1, x2, y2) {
+  var xs = x2 - x1,
+    ys = y2 - y1;
+  return get_angle(xs, ys);
+}
 
-      // draw it
-      var x1 = (x + 2) * this.size;
-      var y1 = (y + 2) * this.size;
-      this.draw_to_canvas(this.alpha.cont, x1, y1, tile, 0);
-      this.draw_to_canvas(this.edge.cont, x1, y1, tile, this.ref.edge);
+/* Get X and Y speed from heading and velocity
+	---------------------------------------- */
 
-      if (decorations) {
-        this.draw_decoration(this.bg.cont, x, y, tile);
-      }
-    }
-  }
-
-  // draw rest of fg
-  var fg = mapgen_pattern(this.alpha.canv, this.img[this.ref.fg]);
-  fg.cont.drawImage(this.edge.canv, 0, 0);
-
-  // draw dirt bg
-  var fg_dirt = mapgen_pattern(fg.canv, this.img[this.ref.bg]);
-  this.bg.cont.drawImage(fg_dirt.canv, 0, 0);
-
-  // export
+function xy_speed(angle, speed) {
+  var a = angle_add(angle, 180),
+    r = (a / 180) * pi;
   return {
-    fg: fg,
-    bg: this.bg
+    x: speed * cos(r),
+    y: speed * sin(r)
   };
 }
 
-/* Draw an alpha path
+/* Get X and Y offset from heading and velocity
 	---------------------------------------- */
 
-mapgen_blob.prototype.draw_path = function(canv, path) {
-  // start paths on canvases
-  canv.cont.beginPath();
-  canv.cont.moveTo(path[0].x, path[0].y);
+function xy_offset(angle, sx, sy) {
+  var xy1 = xy_speed(angle, sx);
+  var xy2 = xy_speed(angle_add(angle, 90), sy);
+  return {
+    x: xy1.x + xy2.x,
+    y: xy1.y + xy2.y
+  };
+}
 
-  // go through path
-  for (var i = 1; i < path.length - 1; i++) {
-    // get next point to curve around
-    var point1 = path[i],
-      point2 = path[i + 1],
-      qx,
-      qy;
+/* Get difference between two numbers in a loop
+	---------------------------------------- */
 
-    // get curve values
-    if (i < path.length - 1) {
-      qx = (point1.x + point2.x) / 2;
-      qy = (point1.y + point2.y) / 2;
-    } else {
-      qx = point2.x;
-      qy = point2.y;
-    }
-
-    // draw curve to path
-    canv.cont.quadraticCurveTo(point1.x, point1.y, qx, qy);
+function n_diff(current, target, bottom, top) {
+  if (current == target) {
+    return 0;
   }
 
-  // rejoin the beginning of the path and fill
-  canv.cont.lineTo(path[0].x, path[0].y);
-  canv.cont.fill();
-};
+  var scale = abs(top - bottom), // get total size of the loop
+    c_current = current - bottom, // correct current for negative numbers
+    c_target = target - bottom, // correct target for negative numbers
+    n1 = (c_target + scale - c_current) % scale, // get difference when adding
+    n2 = (c_current + scale - c_target) % scale; // get difference when subtracting
 
-/* Draw a decoration
+  // return smallest distance
+  if (n1 < n2) {
+    return n1;
+  } else {
+    return -n2;
+  }
+}
+
+/* Auto loop a number
 	---------------------------------------- */
 
-mapgen_blob.prototype.draw_decoration = function(cont, x, y, tile) {
-  // are we drawing one
-  if (tile > 7 || Math.floor(Math.random() * 2) !== 0) {
+function n_loop(n, bottom, top) {
+  var difference = abs(top - bottom);
+  while (n <= bottom) {
+    n += difference;
+  }
+  while (n > top) {
+    n -= difference;
+  }
+  return n;
+}
+
+/* Add to a number without overflowing up or down from min/max
+	---------------------------------------- */
+
+function n_add(n1, n2, t1, t2) {
+  var dif = abs(t2 - t1),
+    na = n1 + n2;
+  while (na < t1) {
+    na += dif;
+  }
+  while (na >= t2) {
+    na -= dif;
+  }
+  return na;
+}
+
+/* Add to an angle without overflowing up or down from 0-360
+	---------------------------------------- */
+
+function angle_add(angle, add) {
+  if (!angle) {
+    angle = 0;
+  }
+  return n_add(angle, add, 0, 360);
+}
+
+/* Move number towards a new number with loop
+	---------------------------------------- */
+
+function increment_num(current, target, bottom, top, speed) {
+  var diff = n_diff(current, target, bottom, top); // get shortest route to number
+  move = min(abs(diff) / 10, 4) * speed; // calculate how much to move
+
+  // if difference is less then movement, return target
+  if (abs(diff) < move) {
+    return target;
+  }
+
+  // add or subtract movement
+  move = diff < 0 ? -move : move;
+  return n_add(current, move, bottom, top);
+}
+
+/* Move angle towards a new angle
+	---------------------------------------- */
+
+function increment_angle(old_angle, new_angle, speed) {
+  return increment_num(old_angle, new_angle, 0, 360, speed);
+}
+
+/* If a point is within a circle
+	---------------------------------------- */
+
+function in_circle(x, y, cx, cy, radius) {
+  return get_distance(x, y, cx, cy) < radius;
+}
+
+/* Plot a course
+	---------------------------------------- */
+
+function plot_course(x, y, sx, sy, extend) {
+  // get initial speed
+  var extend = extend ? extend : 0,
+    speed = get_speed(sx, sy);
+
+  // if no distance then do nothing
+  if (speed == 0) {
+    return { move: false };
+  }
+
+  // calculate increments
+  var increment_x = sx / speed,
+    increment_y = sy / speed,
+    new_x = x - increment_x * extend,
+    new_y = y - increment_y * extend,
+    points = [{ x: new_x, y: new_y }];
+
+  // iterate through path and record points
+  for (var i = 0; i < speed + extend * 2; i++) {
+    (new_x += increment_x), (new_y += increment_y);
+    points.push({
+      x: new_x,
+      y: new_y
+    });
+  }
+
+  // return point array
+  return {
+    move: true,
+    points: points
+  };
+}
+
+/* translate co-ordinates by an angle
+	---------------------------------------- */
+
+function rotate_coords(x, y, cx, cy, angle) {
+  var r = (pi / 180) * angle;
+  return {
+    x: cos(r) * (x - cx) + sin(r) * (y - cy) + cx,
+    y: cos(r) * (y - cy) - sin(r) * (x - cx) + cy
+  };
+}
+
+/* ========================================================================
+    Misc Functions
+ ========================================================================== */
+
+/* Duplicate object
+	---------------------------------------- */
+
+function duplicate_obj(obj) {
+  return JSON.parse(JSON.stringify(obj));
+}
+
+/* Prevent array merging
+	---------------------------------------- */
+
+function dont_merge(destination, source) {
+  if (!source) {
+    return destination;
+  } else {
+    return source;
+  }
+}
+
+/* Add space to a string
+	---------------------------------------- */
+
+function str_space(str) {
+  var new_str = "";
+  for (var i = 0; i < str.length; i++) {
+    var add = i == str.length - 1 ? "" : "\u200A";
+    new_str += str[i] + add;
+  }
+  return new_str;
+}
+
+/* Log multiple values
+	---------------------------------------- */
+
+function clog(
+  s1,
+  s2,
+  s3,
+  s4,
+  s5,
+  s6,
+  s7,
+  s8,
+  s9,
+  s10,
+  s11,
+  s12,
+  s13,
+  s14,
+  s15
+) {
+  var str = s1;
+  if (s2 != undefined) {
+    str += " | " + s2;
+  }
+  if (s3 != undefined) {
+    str += " | " + s3;
+  }
+  if (s4 != undefined) {
+    str += " | " + s4;
+  }
+  if (s5 != undefined) {
+    str += " | " + s5;
+  }
+  if (s6 != undefined) {
+    str += " | " + s6;
+  }
+  if (s7 != undefined) {
+    str += " | " + s7;
+  }
+  if (s8 != undefined) {
+    str += " | " + s8;
+  }
+  if (s9 != undefined) {
+    str += " | " + s9;
+  }
+  if (s10 != undefined) {
+    str += " | " + s10;
+  }
+  if (s11 != undefined) {
+    str += " | " + s11;
+  }
+  if (s12 != undefined) {
+    str += " | " + s12;
+  }
+  if (s13 != undefined) {
+    str += " | " + s13;
+  }
+  if (s14 != undefined) {
+    str += " | " + s14;
+  }
+  if (s15 != undefined) {
+    str += " | " + s15;
+  }
+  console.log(str);
+}
+
+/* ========================================================================
+    Actions
+ ========================================================================== */
+
+/* Perform action
+	---------------------------------------- */
+
+core.prototype.action = function(player_id, action) {
+  var response = { success: false };
+  var player = this.state.players[player_id];
+  var obj = this.state.objects["player-" + player_id];
+  if (!player || !action || !obj) {
+    return response;
+  }
+
+  var locked_obj = this.state.objects[player.locked];
+
+  // players can do stuff
+  if (!player.dead && !locked_obj && player.hit === 0) {
+    // run them
+    if (action.action === "move") {
+      response = this.action_move(response, player, obj, action);
+    }
+    if (action.action === "jump") {
+      response = this.action_jump(response, player, obj, action);
+    }
+    if (action.action === "shoot") {
+      response = this.action_shoot(response, player, obj, action);
+    }
+  }
+
+  response.x = obj.x;
+  response.y = obj.y;
+  response.speed_x = obj.speed_x;
+  response.speed_y = obj.speed_y;
+  response.frame = this.state.frame;
+
+  // return status
+  return response;
+};
+
+/* Walking
+	---------------------------------------- */
+
+core.prototype.action_move = function(response, player, obj, action) {
+  response.type = "walk";
+
+  if (obj.grounded) {
+    var speed = this.scheme.levels.speed[player.level] || obj.c.speed.move;
+    var speed = action.speed || speed;
+    var walk = this.map.walk(obj.x, obj.y, obj.x, obj.y, action.angle, speed);
+    if (walk.move) {
+      if (this.action_walk_move(obj, walk.path)) {
+        // record player event
+        player.events.push({ frame: this.state.frame, type: "walk" });
+
+        // return success
+        response.success = true;
+      }
+    }
+  }
+
+  return response;
+};
+
+/* Walking in a direction
+	---------------------------------------- */
+
+core.prototype.action_walk_dir = function(obj, dir, speed) {
+  var speed = speed || obj.c.speed.move;
+
+  // get initial path
+  var walk = this.map.walk(obj.x, obj.y, obj.x, obj.y, 0, speed);
+
+  if (walk.direction != dir) {
+    walk = this.map.walk(obj.x, obj.y, obj.x, obj.y, 180, speed);
+    if (walk.direction != dir) {
+      walk = this.map.walk(obj.x, obj.y, obj.x, obj.y, 90, speed);
+      if (walk.direction != dir) {
+        walk = this.map.walk(obj.x, obj.y, obj.x, obj.y, 270, speed);
+        if (walk.direction != dir) {
+          return;
+        }
+      }
+    }
+  }
+  if (!walk.move) {
     return;
   }
 
-  // can we do doubles
-  var double = false;
-  if (tile === 0 && this.is_type(y, x + 1, 0)) {
-    double = true;
-  }
-  if (tile === 1 && this.is_type(y, x - 1, 1)) {
-    double = true;
-  }
-  if (tile === 2 && this.is_type(y - 1, x, 2)) {
-    double = true;
-  }
-  if (tile === 3 && this.is_type(y + 1, x, 3)) {
-    double = true;
-  }
-  if (tile === 4 && this.is_type(y - 1, x + 1, 4)) {
-    double = true;
-  }
-  if (tile === 5 && this.is_type(y + 1, x + 1, 5)) {
-    double = true;
-  }
-  if (tile === 6 && this.is_type(y - 1, x - 1, 6)) {
-    double = true;
-  }
-  if (tile === 7 && this.is_type(y + 1, x - 1, 7)) {
-    double = true;
-  }
-
-  // choose source
-  var source = this.ref.decorations[1];
-  if (double && Math.floor(Math.random() * 2) === 0) {
-    source = this.ref.decorations[2];
-  } else {
-    double = false;
-  }
-
-  // choose decoration
-  var i = Math.floor(Math.random() * source.length);
-  var ref = source[i];
-
-  // get position to draw it
-  var half = this.size / 2;
-  var x1 = (x + 2) * this.size;
-  var y1 = (y + 2) * this.size;
-  var angle = 0;
-  if (tile === 1) {
-    x1 += this.size;
-    y1 += this.size;
-    angle = 180;
-  }
-  if (tile === 2) {
-    y1 += this.size;
-    angle = 270;
-  }
-  if (tile === 3) {
-    x1 += this.size;
-    angle = 90;
-  }
-  if (tile === 4) {
-    y1 += this.size;
-    angle = 315;
-  }
-  if (tile === 5) {
-    angle = 45;
-  }
-  if (tile === 6) {
-    x1 += this.size;
-    y1 += this.size;
-    angle = 225;
-  }
-  if (tile === 7) {
-    x1 += this.size;
-    angle = 135;
-  }
-
-  // draw that shit
-  var x_add = double ? this.size : 0;
-  cont.save();
-  cont.translate(x1, y1);
-  cont.rotate((angle * Math.PI) / 180);
-  cont.drawImage(
-    this.img.decorations,
-    ref.x,
-    ref.y,
-    ref.w,
-    ref.h,
-    0,
-    -ref.h + 5,
-    ref.w,
-    ref.h
-  );
-  cont.translate(-x1, -y1);
-  cont.restore();
+  this.action_walk_move(obj, walk.path);
 };
 
-/* Draw a tile to a canvas
+/* Walk moving
 	---------------------------------------- */
 
-mapgen_blob.prototype.draw_to_canvas = function(cont, x, y, tile, key) {
-  var ts = this.size;
-  cont.save();
-  cont.translate(x, y);
-  cont.drawImage(this.img.edge, tile * ts, key * ts, ts, ts, 0, 0, ts, ts);
-  cont.translate(-y, -y);
-  cont.restore();
-};
+core.prototype.action_walk_move = function(obj, path) {
+  // go through the course
+  var x1 = obj.x;
+  var y1 = obj.y;
+  for (var i = 1; i < path.length; i++) {
+    var point = path[i];
 
-/* Get corner and land tiles
-	---------------------------------------- */
-
-mapgen_blob.prototype.set_corner_tile = function(y, x) {
-  var tile = -1;
-
-  //land
-  if (this.is_land(y, x)) {
-    tile = 12;
-
-    // not land
-  } else {
-    // corners
-    if (
-      !this.is_land(y - 1, x) &&
-      !this.is_land(y, x - 1) &&
-      this.is_land(y + 1, x) &&
-      this.is_land(y, x + 1)
-    ) {
-      tile = 4;
-    } else if (
-      !this.is_land(y - 1, x) &&
-      this.is_land(y, x - 1) &&
-      this.is_land(y + 1, x) &&
-      !this.is_land(y, x + 1)
-    ) {
-      tile = 5;
-    } else if (
-      this.is_land(y - 1, x) &&
-      !this.is_land(y, x - 1) &&
-      !this.is_land(y + 1, x) &&
-      this.is_land(y, x + 1)
-    ) {
-      tile = 6;
-    } else if (
-      this.is_land(y - 1, x) &&
-      this.is_land(y, x - 1) &&
-      !this.is_land(y + 1, x) &&
-      !this.is_land(y, x + 1)
-    ) {
-      tile = 7;
+    // check object collisions
+    var col = this.collisions(obj, point.x, point.y);
+    if (col) {
+      return;
     }
+
+    obj.x = point.x;
+    obj.y = point.y;
+    obj.moved = true;
   }
 
-  return tile;
-};
-
-/* Set land tile types
-	---------------------------------------- */
-
-mapgen_blob.prototype.set_land_tile = function(y, x) {
-  var tile = 12;
-
-  // corners
-  if (
-    !this.is_land(y - 1, x) &&
-    !this.is_land(y, x - 1) &&
-    this.is_land_or_corner(y + 1, x) &&
-    this.is_land_or_corner(y, x + 1) &&
-    !this.is_corner(y, x - 1) &&
-    !this.is_corner(y - 1, x)
-  ) {
-    tile = 4;
-  } else if (
-    !this.is_land(y - 1, x) &&
-    !this.is_land(y, x + 1) &&
-    this.is_land_or_corner(y, x - 1) &&
-    this.is_land_or_corner(y + 1, x) &&
-    !this.is_corner(y, x + 1) &&
-    !this.is_corner(y - 1, x)
-  ) {
-    tile = 5;
-  } else if (
-    !this.is_land(y, x - 1) &&
-    !this.is_land(y + 1, x) &&
-    this.is_land_or_corner(y - 1, x) &&
-    this.is_land_or_corner(y, x + 1) &&
-    !this.is_corner(y, x - 1) &&
-    !this.is_corner(y + 1, x)
-  ) {
-    tile = 6;
-  } else if (
-    !this.is_land(y + 1, x) &&
-    !this.is_land(y, x + 1) &&
-    this.is_land_or_corner(y - 1, x) &&
-    this.is_land_or_corner(y, x - 1) &&
-    !this.is_corner(y, x + 1) &&
-    !this.is_corner(y + 1, x)
-  ) {
-    tile = 7;
-
-    // flat edges
-  } else if (
-    !this.is_land(y - 1, x) &&
-    this.is_land(y + 1, x) &&
-    !this.is_corner(y - 1, x)
-  ) {
-    tile = 0;
-  } else if (
-    !this.is_land(y + 1, x) &&
-    this.is_land(y - 1, x) &&
-    !this.is_corner(y + 1, x)
-  ) {
-    tile = 1;
-  } else if (
-    !this.is_land(y, x - 1) &&
-    this.is_land(y, x + 1) &&
-    !this.is_corner(y, x - 1)
-  ) {
-    tile = 2;
-  } else if (
-    !this.is_land(y, x + 1) &&
-    this.is_land(y, x - 1) &&
-    !this.is_corner(y, x + 1)
-  ) {
-    tile = 3;
-
-    // inside corners
-  } else if (this.is_type(y + 1, x, 7) || this.is_type(y, x + 1, 7)) {
-    tile = 8;
-  } else if (this.is_type(y + 1, x, 6) || this.is_type(y, x - 1, 6)) {
-    tile = 9;
-  } else if (this.is_type(y - 1, x, 5) || this.is_type(y, x + 1, 5)) {
-    tile = 10;
-  } else if (this.is_type(y - 1, x, 4) || this.is_type(y, x - 1, 4)) {
-    tile = 11;
-  }
-
-  return tile;
-};
-
-/* Check arrays for values
-	---------------------------------------- */
-
-mapgen_blob.prototype.is_land_or_corner = function(y, x) {
-  if (this.is_corner(y, x) || this.is_land(y, x)) {
+  if (obj.moved) {
     return true;
   }
 };
 
-mapgen_blob.prototype.is_corner = function(y, x) {
-  return this.check_arr(this.tiles, y, x, [4, 5, 6, 7]);
-};
+/* Jumping
+	---------------------------------------- */
 
-mapgen_blob.prototype.is_type = function(y, x, type) {
-  return this.check_arr(this.tiles, y, x, [type]);
-};
+core.prototype.action_jump = function(response, player, obj, action) {
+  response.type = "jump";
 
-mapgen_blob.prototype.is_land = function(y, x) {
-  return this.check_arr(this.land, y, x, [1]);
-};
+  if (obj.grounded && player.cooldown === 0) {
+    var speed = this.scheme.levels.jump[player.level] || obj.c.speed.jump;
+    var xy = xy_speed(action.angle, speed);
+    obj.speed_x = xy.x.fixed();
+    obj.speed_y = xy.y.fixed();
+    if (this.physics_move(obj)) {
+      // set grounding
+      obj.grounded = false;
 
-mapgen_blob.prototype.check_arr = function(arr, y, x, checks) {
-  if (y < 0 || y >= arr.length || x < 0 || x >= arr[0].length) {
-    return false;
+      // set cooldown
+      player.cooldown = 7;
+
+      // record player event
+      player.events.push({ frame: this.state.frame, type: "jump" });
+
+      // return success
+      response.success = true;
+    }
   }
-  for (var i = 0; i < checks.length; i++) {
-    if (arr[y][x] == checks[i]) {
+
+  return response;
+};
+
+/* Shooting weapon
+	---------------------------------------- */
+
+core.prototype.action_shoot = function(response, player, obj, action) {
+  response.type = "shoot";
+
+  // if waiting for cooldown
+  // is not real weapon
+  // do we need to walk
+  // check armoury count
+  var weapon = this.c.weapons[action.weapon];
+  if (
+    (player.cooldown === 0 && !weapon) ||
+    (weapon.require_walk && !obj.grounded) ||
+    player.armoury[action.weapon] === 0
+  ) {
+    return response;
+  }
+
+  // crate the object
+  var speed = xy_speed(action.angle, weapon.speed);
+  var shot_obj = this.create_object({
+    type: weapon.object,
+    player_id: player.id,
+    x: obj.x,
+    y: obj.y,
+    speed_x: (speed.x + obj.speed_x * weapon.inertia).fixed(),
+    speed_y: (speed.y + obj.speed_y * weapon.inertia).fixed()
+  });
+
+  // set player recoil
+  if (!obj.grounded) {
+    obj.speed_x += (-speed.x * weapon.recoil).fixed();
+    obj.speed_y += (-speed.y * weapon.recoil).fixed();
+  }
+
+  // set armoury values
+  this.update_player_armoury(player.id, action.weapon, -1);
+
+  // set cooldown
+  player.cooldown = weapon.cooldown;
+
+  // set player lock
+  if (shot_obj.c.player_lock) {
+    player.locked = shot_obj.key;
+  }
+
+  // record player event
+  player.events.push({
+    frame: this.state.frame,
+    type: "shoot",
+    obj: shot_obj.key,
+    weapon: action.weapon
+  });
+
+  // return success
+  response.success = true;
+  return response;
+};
+
+/* ========================================================================
+    Collisions
+ ========================================================================== */
+
+/* Run single collision check
+	---------------------------------------- */
+
+core.prototype.collisions = function(obj, x, y) {
+  // check collision with ground
+  if (this.map.i(round(x), round(y))) {
+    var event = this.event(obj, "ground", null);
+    if (event) {
+      return event;
+    }
+  }
+
+  // check collisions with other objects
+  for (var key in this.state.objects) {
+    if (obj.key === key) {
+      continue;
+    }
+    if (this.collision_obj(obj, x, y, this.state.objects[key])) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
+/* Run object collision check
+	---------------------------------------- */
+
+core.prototype.collision_obj = function(obj, x, y, check_obj) {
+  // if no collision
+  if (
+    this.collision_check(
+      x,
+      y,
+      check_obj.x,
+      check_obj.y,
+      obj.c.size,
+      check_obj.c.size
+    )
+  ) {
+    return;
+  }
+
+  // prevent hits on parent players for a short time or if they're player locked
+  if (
+    check_obj.type === "player" &&
+    check_obj.player_id === obj.player_id &&
+    (this.state.frame < obj.frame + 15 || obj.c.player_lock)
+  ) {
+    return;
+  }
+
+  // prevent clusters hitting each other for a short time
+  if (
+    check_obj.frame === obj.frame &&
+    check_obj.player_id === obj.player_id &&
+    this.state.frame < obj.frame + 60
+  ) {
+    return;
+  }
+
+  // trigger basic object collision event
+  if (this.event(obj, "object", check_obj)) {
+    return true;
+  }
+
+  // trigger specific object collision event
+  var event = obj.c.object_events[check_obj.type];
+  if (event) {
+    if (this.run_event(obj, event, check_obj)) {
       return true;
     }
   }
 };
 
-/* ========================================================================
-	Map Generator
-	Make Canvas
- ========================================================================== */
-
-/* Set up a new canvas
+/* Collision Maths
 	---------------------------------------- */
 
-function mapgen_canvas(w, h) {
-  var obj = {};
-  if ("undefined" != typeof global) {
-    obj.canv = new canvas();
-  } else {
-    obj.canv = document.createElement("canvas");
-  }
-  obj.cont = obj.canv.getContext("2d");
-  obj.canv.width = w;
-  obj.canv.height = h;
-  obj.cont.fillStyle = "#fff";
-  obj.w = w;
-  obj.h = h;
-  return obj;
-}
-
-/* Draw a pattern to a canvas
-	---------------------------------------- */
-
-function mapgen_pattern(alpha, pattern) {
-  var canv = mapgen_canvas(alpha.width, alpha.height);
-  if (typeof pattern !== "string") {
-    pattern = canv.cont.createPattern(pattern, "repeat");
-  }
-  canv.cont.fillStyle = pattern;
-  canv.cont.fillRect(0, 0, alpha.width, alpha.height);
-  canv.cont.globalCompositeOperation = "destination-in";
-  canv.cont.drawImage(alpha, 0, 0);
-  canv.cont.globalCompositeOperation = "normal";
-
-  return canv;
-}
+core.prototype.collision_check = function(x1, y1, x2, y2, s1, s2) {
+  return this.map.get_distance(x1, y1, x2, y2) > s1 + s2;
+};
 
 /* ========================================================================
-	Map Generator
-	------------
-	Config:
-	w           // width of map
-	h           // height of map
-	crust       // thickness of outer crust on land
-	blobs       // initial blobs
-	center_blob // size of center blob of land, 0 for none
-	small_blobs // number of random small circles of land
-	large_blobs // number of random large circles of land
-	-----------
+    Core
  ========================================================================== */
 
-/* Server side only
+/* create core object
 	---------------------------------------- */
 
-if ("undefined" != typeof global) {
-  var fs = require("fs");
-}
-
-/* New Map Generation
-	---------------------------------------- */
-
-function mapgen(img, config, scheme, map_img) {
-  this.size = 36;
-  this.img = img;
+function core(config, scheme, map, gravity_map) {
+  // config
   this.c = config;
   this.scheme = scheme;
+  this.map = new core_map(map, scheme, gravity_map);
 
-  // choose type
-  if (this.scheme.type == "random") {
-    return this.draw_random();
+  // crate chance table
+  this.crate_list = [];
+  for (var key in this.scheme.weapons) {
+    for (var i = 0; i < this.scheme.weapons[key].crate_chance; i++) {
+      this.crate_list.push(key);
+    }
   }
-  if (this.scheme.type == "image") {
-    return this.draw_image(map_img);
+
+  // armoury reference table
+  this.armoury_refs = [];
+  for (key in this.scheme.weapons) {
+    this.armoury_refs.push(key);
   }
 }
 
-/* Draw image
+/* Set a blank state
 	---------------------------------------- */
 
-mapgen.prototype.draw_image = function(map_img) {
-  var fg = mapgen_canvas(
-    map_img.width + this.scheme.gap * 2,
-    map_img.height + this.scheme.gap * 2
-  );
-  fg.cont.drawImage(map_img, this.scheme.gap, this.scheme.gap);
-  var bg = mapgen_pattern(fg.canv, this.img.dirt);
-  return { fg: fg, bg: bg };
+core.prototype.blank_state = function() {
+  return {
+    frame: 0,
+    explosions: {},
+    objects: {},
+    players: {},
+    events: []
+  };
 };
 
-/* Draw random
+/* Run every frame
 	---------------------------------------- */
 
-mapgen.prototype.draw_random = function() {
-  // setup
-  this.blobs = JSON.parse(JSON.stringify(this.scheme.blobs));
-  this.bg = mapgen_canvas(this.scheme.w, this.scheme.h);
-  this.fg = mapgen_canvas(this.scheme.w, this.scheme.h);
+core.prototype.frame = function() {
+  this.frame_explosions();
+  this.frame_players();
+  this.frame_objects();
+};
 
-  // generate some random large circles
-  for (var i = 0; i < this.scheme.large_blobs; i++) {
-    this.blobs = this.get_circle(this.blobs, 4, 6);
+/* ========================================================================
+    Events
+ ========================================================================== */
+
+/* Run a specific type of event
+	---------------------------------------- */
+
+core.prototype.event = function(obj, type, collided_obj) {
+  var event = obj.c.events[type];
+  if (!event) {
+    return;
+  }
+  return this.run_event(obj, event, collided_obj, type);
+};
+
+/* Run a specific event
+	---------------------------------------- */
+
+core.prototype.run_event = function(obj, event, collided_obj, type) {
+  // handle arrays of events
+  if (Array.isArray(event)) {
+    var stop = false;
+    for (var i = 0; i < event.length; i++) {
+      var stop2 = this.run_event(obj, event[i], collided_obj, type);
+      stop = stop2 ? true : stop;
+    }
+    return stop;
   }
 
-  // generate some random small circles
-  for (var i = 0; i < this.scheme.small_blobs; i++) {
-    this.blobs = this.get_circle(this.blobs, 1, 3);
+  // run event function
+  if (event === "die") {
+    return this.event_die(obj, collided_obj, type);
+  } else if (event === "kill") {
+    return this.event_kill(obj, collided_obj);
+  } else if (event === "explode") {
+    return this.event_explode(obj);
+  } else if (event === "hit_give") {
+    return this.event_hit_give(obj, collided_obj, type);
+  } else if (event === "hit_receive") {
+    return this.event_hit_receive(obj, collided_obj, type);
+  } else if (event === "destroy") {
+    return this.event_destroy(obj);
+  } else if (event === "cluster") {
+    return this.event_cluster(obj);
+  } else if (event === "bounce") {
+    return this.event_bounce(obj, collided_obj, type);
+  } else if (event === "bounce_explode") {
+    return this.event_bounce_explode(obj, collided_obj, type);
+  } else if (event === "stick") {
+    return this.event_stick(obj);
+  } else if (event === "slide") {
+    return this.event_slide(obj);
+  } else if (event === "player_bounce") {
+    return this.event_player_bounce(obj, collided_obj, type);
+  } else if (event === "drag_player") {
+    return this.event_drag_player(obj);
+  } else if (event === "spawn_ghost") {
+    return this.event_spawn_ghost(obj);
+  } else if (event === "collect") {
+    return this.event_collect(obj, collided_obj);
+  }
+};
+
+/* Object die
+	---------------------------------------- */
+
+core.prototype.event_die = function(obj, collided_obj, type) {
+  // die event
+  this.event(obj, "die");
+
+  // check for destroy events
+  if (this.scheme.events.destroy) {
+    if (this.scheme.events.destroy[obj.id]) {
+      this.state.events.push(this.scheme.events.destroy[obj.id]);
+    }
   }
 
-  // go through each blob
-  for (var i = 0; i < this.blobs.length; i++) {
-    var blob = this.blobs[i];
+  // delete the object
+  delete this.state.objects[obj.key];
 
-    // create the blobs
-    var bg = new mapgen_blob(this.img, this.c, false, blob.r + 4, blob.type);
-    var fg = new mapgen_blob(
-      this.img,
-      this.c,
-      this.scheme.decorations,
-      blob.r,
-      blob.type
+  return true;
+};
+
+/* Object kill
+	---------------------------------------- */
+
+core.prototype.event_kill = function(obj, collided_obj) {
+  // destroy it
+  this.run_event(collided_obj, "die");
+};
+
+/* Explode
+	---------------------------------------- */
+
+core.prototype.event_explode = function(obj) {
+  // create explosion object
+  this.create_explosion({
+    player_id: obj.player_id,
+    x: obj.x,
+    y: obj.y,
+    parent: obj.key,
+    parent_type: obj.type
+  });
+};
+
+/* Give a hit
+	---------------------------------------- */
+
+core.prototype.event_hit_give = function(obj, collided_obj, type) {
+  return this.run_event(collided_obj, "hit_receive", obj, type);
+};
+
+/* Receive a hit
+	---------------------------------------- */
+
+core.prototype.event_hit_receive = function(obj, collided_obj, type) {
+  // prevent instant hits
+  if (obj.hits) {
+    for (var key in obj.hits) {
+      if (key === collided_obj.key) {
+        return;
+      }
+    }
+  }
+
+  // calculate direction and distance it came from
+  var angle = this.map.get_heading(
+    obj.x,
+    obj.y,
+    collided_obj.x,
+    collided_obj.y
+  );
+  var distance = this.map.get_distance(
+    obj.x,
+    obj.y,
+    collided_obj.x,
+    collided_obj.y
+  );
+
+  // get damage values from collided object
+  var damage = this.get_damage(collided_obj);
+  var knock = collided_obj.c.knock;
+  if (collided_obj.type === "explosion") {
+    damage *= max(0, (damage * 2 - distance) / (damage * 2));
+  }
+
+  // ignore if there's no damage
+  if (damage === 0) {
+    return;
+  }
+
+  // knock object
+  if (knock > 0) {
+    var xy = xy_speed(angle, damage);
+    obj.speed_x -= xy.x.fixed();
+    obj.speed_y -= xy.y.fixed();
+    obj.grounded = false;
+  }
+
+  // are we hitting player
+  if (obj.type === "player") {
+    this.player_health_add(obj.player_id, -round(damage));
+    var player = this.state.players[obj.player_id];
+    if (player) {
+      player.hit = damage * 2;
+    }
+  }
+
+  // sound effect
+  if (collided_obj.c.audio.hit) {
+    this.state.events.push({
+      type: "sound",
+      x: obj.x,
+      y: obj.y,
+      sound: collided_obj.c.audio.hit
+    });
+  }
+
+  // set hits
+  if (!obj.hits) {
+    obj.hits = {};
+  }
+  obj.hits[collided_obj.key] = true;
+};
+
+/* Destroy ground
+	---------------------------------------- */
+
+core.prototype.event_destroy = function(obj) {
+  // limit to once per frame
+  if (obj.destroyed) {
+    return;
+  }
+  obj.destroyed = true;
+
+  var damage = this.get_damage(obj);
+
+  // record ground damage
+  this.state.events.push({
+    type: "ground_damage",
+    frame: this.state.frame,
+    dig: true,
+    x: obj.x,
+    y: obj.y,
+    radius: damage
+  });
+};
+
+/* Object bounce
+	---------------------------------------- */
+
+core.prototype.event_bounce = function(obj, collided_obj, type) {
+  // if grounded dont do anything
+  if (obj.grounded) {
+    return true;
+  }
+
+  // check speed
+  var speed = get_speed(obj.speed_x, obj.speed_y);
+  var check_speed = speed * obj.c.bounce;
+  if (check_speed < 1) {
+    obj.speed_x = 0;
+    obj.speed_y = 0;
+    return true;
+  }
+
+  // get new direction angle
+  var direction = get_angle(obj.speed_x, obj.speed_y);
+  var surface_angle = 0;
+
+  // get angle from ground
+  if (type === "ground") {
+    var walk = this.map.walk(round(obj.x), round(obj.y), 0, 0, direction, 6);
+    if (walk.move) {
+      surface_angle = walk.angle;
+    }
+  }
+
+  // get angle from object
+  else {
+    var heading = this.map.get_heading(
+      obj.x,
+      obj.y,
+      collided_obj.x,
+      collided_obj.y
     );
-
-    // combine the backgrounds
-    var wh = fg.fg.canv.width;
-    var new_bg = mapgen_canvas(wh, wh);
-    new_bg.cont.drawImage(bg.fg.canv, wh * 0.1, wh * 0.1, wh * 0.8, wh * 0.8);
-    new_bg.cont.globalCompositeOperation = "source-atop";
-    new_bg.cont.fillStyle = "rgba(0,0,0,0.8)";
-    new_bg.cont.fillRect(0, 0, wh, wh);
-    new_bg.cont.globalCompositeOperation = "normal";
-    new_bg.cont.drawImage(fg.bg.canv, 0, 0);
-
-    // draw it to main canvas
-    this.bg.cont.drawImage(new_bg.canv, blob.x - wh / 2, blob.y - wh / 2);
-    this.fg.cont.drawImage(fg.fg.canv, blob.x - wh / 2, blob.y - wh / 2);
+    surface_angle = angle_add(heading, 90);
   }
+
+  // reflect direction angle with collision angle
+  var reflection = (direction - surface_angle) * 2;
+  var new_angle = angle_add(direction, -reflection);
+
+  // transform main velocity towards new angle
+  var new_speed = xy_speed(new_angle, check_speed);
+  obj.speed_x = new_speed.x.fixed();
+  obj.speed_y = new_speed.y.fixed();
+
+  // record bounce event
+  if (speed > 2) {
+    this.state.events.push({
+      type: "bounce",
+      x: obj.x,
+      y: obj.y,
+      obj: obj.key
+    });
+  }
+
+  return true;
+};
+
+/* Object stick to ground
+	---------------------------------------- */
+
+core.prototype.event_stick = function(obj) {
+  obj.grounded = true;
+  obj.speed_x = 0;
+  obj.speed_y = 0;
+  return true;
+};
+
+/* Object slide
+	---------------------------------------- */
+
+core.prototype.event_slide = function(obj) {
+  var angle = get_angle(obj.speed_x, obj.speed_y);
+  var walk = this.map.walk(obj.x, obj.y, obj.x, obj.y, angle, obj.speed_left);
+  if (walk.move) {
+    this.action_walk_move(obj, walk.path);
+  }
+  return true;
+};
+
+/* Player bounce
+	---------------------------------------- */
+
+core.prototype.event_player_bounce = function(obj, collided_obj, type) {
+  // if grounded dont do anything
+  if (obj.grounded) {
+    return true;
+  }
+
+  var player = this.state.players[obj.player_id];
+  if (!player) {
+    return;
+  }
+  var speed = get_speed(obj.speed_x, obj.speed_y);
+
+  var max_speed = this.scheme.levels.jump[player.level] || 0;
+  max_speed += 10;
+  if (player.hit > 0 || speed > max_speed) {
+    return this.run_event(obj, "bounce", collided_obj, type);
+  } else {
+    return this.run_event(obj, "stick");
+  }
+};
+
+/* Drag player
+	---------------------------------------- */
+
+core.prototype.event_drag_player = function(obj) {
+  var player_obj = this.state.objects["player-" + obj.player_id];
+  if (!player_obj) {
+    return;
+  }
+
+  player_obj.speed_x = obj.speed_x;
+  player_obj.speed_y = obj.speed_y;
+  player_obj.dragged = true;
+};
+
+/* First Destroy
+	---------------------------------------- */
+
+core.prototype.event_bounce_explode = function(obj, collided_obj, type) {
+  if (obj.frame + 10 > this.state.frame) {
+    return this.run_event(obj, "bounce", collided_obj, type);
+  } else {
+    return this.run_event(obj, "explode");
+  }
+};
+
+/* Spawn player ghost
+	---------------------------------------- */
+
+core.prototype.event_spawn_ghost = function(obj) {
+  // transform object into ghost
+  obj.type = "player_ghost";
+  obj.c = this.c.objects["player_ghost"];
+  obj.speed_x = 0;
+  obj.speed_y = 0;
+};
+
+/* Clusters
+	---------------------------------------- */
+
+core.prototype.event_cluster = function(obj) {
+  // set off explosions
+  this.run_event(obj, "explode");
+
+  // get cluster constants
+  var cluster = obj.c.cluster;
+
+  // get opposite angle of gravity
+  var angle = this.map.get_gravity_angle(obj.x, obj.y);
+  angle = angle_add(angle, 135);
+
+  // go through clusters
+  var range = cluster.circle ? 360 - 360 / cluster.count : 90;
+  var angle_diff = range / (cluster.count - 1);
+  for (var i = 0; i < cluster.count; i++) {
+    // create cluster objects
+    var launch_angle = angle_add(angle, i * angle_diff);
+    var speed = xy_speed(launch_angle, cluster.speed);
+
+    // create cluster object
+    this.create_object({
+      type: cluster.object,
+      id: obj.id,
+      data: i + 1,
+      player_id: obj.player_id,
+      x: obj.x,
+      y: obj.y,
+      speed_x: speed.x.fixed(),
+      speed_y: speed.y.fixed()
+    });
+  }
+
+  return true;
+};
+
+/* Collect Crate
+	---------------------------------------- */
+
+core.prototype.event_collect = function(obj, collided_obj) {
+  // prep event to send to game
+  var event = {
+    type: "collect",
+    obj: collided_obj.key,
+    player_id: obj.player_id
+  };
+  var player = this.state.players[obj.player_id];
+  if (!player) {
+    return;
+  }
+
+  // crate
+  if (collided_obj.type === "crate") {
+    var count = this.scheme.weapons[collided_obj.data].crate_count;
+    count = count === -1 ? "infinite" : count;
+    this.update_player_armoury(obj.player_id, collided_obj.data, count);
+    event.collected = "crate";
+    event.weapon = collided_obj.data;
+    event.count = count;
+    player.events.push({
+      frame: this.state.frame,
+      type: "crate",
+      obj: collided_obj.key
+    });
+  }
+
+  // medpack
+  else if (collided_obj.type === "medpack") {
+    this.player_health_add(obj.player_id, this.scheme.drops.medpack.add);
+    event.collected = "medpack";
+    player.events.push({
+      frame: this.state.frame,
+      type: "medpack",
+      obj: collided_obj.key
+    });
+  }
+
+  // gems
+  else if (collided_obj.type === "gem-1") {
+    this.player_score_add(obj.player_id, 1);
+    event.collected = "gem";
+    event.n = 1;
+    player.events.push({
+      frame: this.state.frame,
+      type: "gem",
+      obj: collided_obj.key
+    });
+  } else if (collided_obj.type === "gem-5") {
+    this.player_score_add(obj.player_id, 5);
+    event.collected = "gem";
+    event.n = 5;
+    player.events.push({
+      frame: this.state.frame,
+      type: "gem",
+      obj: collided_obj.key
+    });
+  } else if (collided_obj.type === "gem-20") {
+    this.player_score_add(obj.player_id, 20);
+    event.collected = "gem";
+    event.n = 20;
+    player.events.push({
+      frame: this.state.frame,
+      type: "gem",
+      obj: collided_obj.key
+    });
+  } else if (collided_obj.type === "gem-50") {
+    this.player_score_add(obj.player_id, 50);
+    event.collected = "gem";
+    event.n = 50;
+    player.events.push({
+      frame: this.state.frame,
+      type: "gem",
+      obj: collided_obj.key
+    });
+  } else if (collided_obj.type === "gem-200") {
+    this.player_score_add(obj.player_id, 200);
+    event.collected = "gem";
+    event.n = 200;
+    player.events.push({
+      frame: this.state.frame,
+      type: "gem",
+      obj: collided_obj.key
+    });
+  }
+
+  // record event
+  this.state.events.push(event);
+
+  // kill object
+  this.run_event(collided_obj, "die", obj, "collect");
+
+  // check for collection events
+  if (this.scheme.events.collect) {
+    if (this.scheme.events.collect[collided_obj.id]) {
+      this.state.events.push(this.scheme.events.collect[collided_obj.id]);
+    }
+  }
+
+  return false;
+};
+
+/* ========================================================================
+    Explosions
+ ========================================================================== */
+
+/* Create an explosion
+	---------------------------------------- */
+
+core.prototype.create_explosion = function(props, state) {
+  var state_ref = state || this.state;
+
+  var obj = {
+    type: "explosion",
+    player_id: "",
+    frame: state_ref.frame,
+    x: 0,
+    y: 0,
+    parent: "",
+    parent_type: ""
+  };
+  obj = deepmerge(obj, props);
+  obj.c = this.c.objects[obj.parent_type];
+
+  // add to state objects
+  state_ref.explosions[obj.parent] = obj;
+};
+
+/* Check all existing explosions
+	---------------------------------------- */
+
+core.prototype.frame_explosions = function() {
+  // go through all explosions
+  for (var key in this.state.explosions) {
+    var explode = this.state.explosions[key];
+
+    // if expired remove
+    if (this.state.frame > explode.frame + 40) {
+      delete this.state.explosions[key];
+    }
+
+    // if exploding this frame run
+    if (this.state.frame === explode.frame + 1) {
+      this.run_explosion(explode);
+    }
+  }
+};
+
+/* Run an explosion
+	---------------------------------------- */
+
+core.prototype.run_explosion = function(explode) {
+  // if no damage
+  if (!explode.c.damage) {
+    return;
+  }
+
+  // calculate additional player damage
+  var damage = this.get_damage(explode);
+
+  // check collisions
+  for (key in this.state.objects) {
+    var obj = this.state.objects[key];
+
+    // if object was just made
+    if (this.state.frame < obj.frame + 2) {
+      continue;
+    }
+
+    // run collision check
+    if (
+      !this.collision_check(
+        obj.x,
+        obj.y,
+        explode.x,
+        explode.y,
+        obj.c.size,
+        damage * 2
+      )
+    ) {
+      this.event(obj, "explosion", explode);
+    }
+  }
+
+  // record ground damage
+  var ptype = this.c.objects[explode.parent_type];
+  if (ptype && ptype.destroy_ground) {
+    this.state.events.push({
+      type: "ground_damage",
+      frame: this.state.frame,
+      x: explode.x,
+      y: explode.y,
+      radius: damage
+    });
+  }
+};
+
+/* ========================================================================
+    Objects
+ ========================================================================== */
+
+/* Create a new game object
+	---------------------------------------- */
+
+core.prototype.create_object = function(props, state) {
+  var state_ref = state || this.state;
+
+  var obj = {
+    type: "",
+    player_id: "",
+    id: "",
+    frame: state_ref.frame,
+    grounded: false,
+    x: 0,
+    y: 0,
+    speed_x: 0,
+    speed_y: 0,
+    data: ""
+  };
+  obj = deepmerge(obj, props);
+  obj.c = this.c.objects[obj.type];
+  var key_type = obj.type;
+
+  // set key
+  if (
+    obj.type === "player" ||
+    obj.type === "player_ghost" ||
+    obj.type === "player_missile"
+  ) {
+    obj.key = "player-" + obj.player_id;
+  } else {
+    obj.key =
+      obj.type +
+      "-" +
+      obj.player_id +
+      "-" +
+      obj.id +
+      "-" +
+      obj.frame +
+      "-" +
+      obj.data;
+  }
+
+  // add to state objects
+  state_ref.objects[obj.key] = obj;
 
   // return it
-  return {
-    bg: this.bg,
-    fg: this.fg
-  };
+  return obj;
 };
 
-/* Get a far away circle
+/* Snap object to another object
 	---------------------------------------- */
 
-mapgen.prototype.get_circle = function(arr, min_radius, max_radius) {
-  // generate many circles and find furthest away
-  var distance = 0;
-  var circle = null;
+core.prototype.snap_object = function(obj1, obj2) {
+  obj1.grounded = obj2.grounded;
+  obj1.x = obj2.x;
+  obj1.y = obj2.y;
+  obj1.speed_x = obj2.speed_x;
+  obj1.speed_y = obj2.speed_y;
+};
 
-  for (var i = 0; i < 20; i++) {
-    // make new circle
-    var test_circle = this.circle(min_radius, max_radius);
-    var smallest_distance = 999999;
+/* Run through object frame events
+	---------------------------------------- */
 
-    // find shortest distance from all other circles
-    for (var j = 0; j < arr.length; j++) {
-      var dx = arr[j].x - test_circle.x;
-      var dy = arr[j].y - test_circle.y;
-      var test_distance = Math.round(
-        Math.sqrt(Math.pow(dx, 2) + Math.pow(dy, 2))
-      );
-      smallest_distance =
-        test_distance < smallest_distance ? test_distance : smallest_distance;
+core.prototype.frame_objects = function() {
+  // run through all objects
+  for (var key in this.state.objects) {
+    this.frame_object(this.state.objects[key]);
+  }
+
+  // check for player lock
+  for (var key in this.state.players) {
+    this.frame_player_lock(this.state.players[key]);
+  }
+};
+
+core.prototype.frame_object = function(obj) {
+  if (!obj) {
+    return;
+  }
+  obj.destroyed = false;
+
+  // stopping
+  if (obj.c.stop > 0 && this.state.frame > obj.frame + obj.c.stop) {
+    obj.speed_x = 0;
+    obj.speed_y = 0;
+  }
+
+  // timeout
+  if (obj.c.timeout > 0 && obj.frame + obj.c.timeout <= this.state.frame) {
+    this.run_event(obj, "die");
+    return;
+  }
+
+  // run physics on object
+  this.physics(obj);
+
+  // events
+  this.event(obj, "frame");
+};
+
+/* Spawns
+	---------------------------------------- */
+
+core.prototype.spawn = function(props) {
+  // weapon crate contents
+  if (props.type == "crate") {
+    if (this.crate_list.length < 1) {
+      return;
     }
+    props.data = this.crate_list[rand(0, this.crate_list.length)];
+  }
 
-    // if is the largest distance record this as furthest
-    if (distance < smallest_distance) {
-      distance = smallest_distance;
-      circle = test_circle;
+  // do we have a set position
+  if (!props.x && !props.y) {
+    var pos = this.map.air_find_spot();
+    props.x = pos.x;
+    props.y = pos.y;
+  }
+
+  return this.create_object(props);
+};
+
+/* ========================================================================
+    Physics
+ ========================================================================== */
+
+/* Run air physics
+	---------------------------------------- */
+
+core.prototype.physics = function(obj) {
+  // are we still grounded
+  if (obj.grounded) {
+    if (!this.map.ground_pixel(round(obj.x), round(obj.y))) {
+      obj.grounded = false;
     }
   }
 
-  // add furthest away circle to new array
-  arr.push(circle);
-  return arr;
+  // run the main physics
+  if (!obj.grounded) {
+    this.physics_gravity(obj);
+    this.physics_move(obj);
+  }
 };
 
-/* Generate a random circle
+/* Calculate gravity
 	---------------------------------------- */
 
-mapgen.prototype.circle = function(min_radius, max_radius) {
-  var r = Math.floor(Math.random() * max_radius) + min_radius;
-  var gap = (r + 2) * this.size + this.scheme.gap;
-  var x = Math.floor(Math.random() * (this.scheme.w - gap * 2)) + gap;
-  var y = Math.floor(Math.random() * (this.scheme.h - gap * 2)) + gap;
-  return {
-    r: r,
-    x: x,
-    y: y
+core.prototype.physics_gravity = function(obj) {
+  // if no weight
+  if (obj.c.weight <= 0) {
+    return;
+  }
+
+  // get gravity values
+  var gravity = this.map.get_gravity(round(obj.x), round(obj.y));
+
+  // adjust speed
+  this.physics_adjust_speed(
+    obj,
+    gravity.x,
+    gravity.y,
+    obj.c.speed.max_gravity,
+    obj.c.weight
+  );
+};
+
+/* Adjust speed of object
+	---------------------------------------- */
+
+core.prototype.physics_adjust_speed = function(
+  obj,
+  new_speed_x,
+  new_speed_y,
+  max_speed,
+  weight
+) {
+  var angle = get_angle(new_speed_x, new_speed_y);
+  var max_speed = xy_speed(angle, max_speed);
+  var speed_add_x = new_speed_x * weight;
+  var speed_add_y = new_speed_y * weight;
+  var diff_x = max_speed.x - obj.speed_x;
+  var diff_y = max_speed.y - obj.speed_y;
+
+  // only add speed up to the limit without bringing it down
+  if (max_speed.x < 0) {
+    obj.speed_x += max(speed_add_x, min(0, diff_x));
+  } else {
+    obj.speed_x += min(speed_add_x, max(0, diff_x));
+  }
+  if (max_speed.y < 0) {
+    obj.speed_y += max(speed_add_y, min(0, diff_y));
+  } else {
+    obj.speed_y += min(speed_add_y, max(0, diff_y));
+  }
+
+  obj.speed_x = obj.speed_x.fixed();
+  obj.speed_y = obj.speed_y.fixed();
+};
+
+/* Do the movement
+	---------------------------------------- */
+
+core.prototype.physics_move = function(obj) {
+  // check speed
+  var speed_limit = check_speed(obj.speed_x, obj.speed_y, obj.c.speed.max);
+  obj.speed_x = speed_limit.x.fixed();
+  obj.speed_y = speed_limit.y.fixed();
+
+  // plot a course
+  var course = plot_course(obj.x, obj.y, obj.speed_x, obj.speed_y);
+
+  // if no course
+  if (!course.move) {
+    this.collisions(obj, obj.x, obj.y);
+    return;
+  }
+
+  // move through course
+  var moved = false;
+  for (var i = 1; i < course.points.length; i++) {
+    // remaining movement points left
+    obj.speed_left = course.points.length - i;
+
+    var point = course.points[i];
+    var nx = this.map.loop_x(round(point.x));
+    var ny = this.map.loop_y(round(point.y));
+
+    // collisions
+    var collision = this.collisions(obj, nx, ny);
+    if (collision) {
+      break;
+    }
+
+    // move object
+    obj.x = nx;
+    obj.y = ny;
+    moved = true;
+  }
+
+  return moved;
+};
+
+/* ========================================================================
+    Players
+ ========================================================================== */
+
+/* Create a new player
+	---------------------------------------- */
+
+core.prototype.create_player = function(props, state) {
+  if (typeof props.id === "undefined") {
+    return;
+  }
+
+  var state_ref = state || this.state;
+
+  // set up object
+  var obj = {
+    id: "",
+    level: 0,
+    score: 0,
+    dead: false,
+    health: this.scheme.levels.health[0],
+    cooldown: 0,
+    hit: 0,
+    weapon: "",
+    locked: "",
+    events: [],
+    armoury: {}
   };
+  obj = deepmerge(obj, props);
+  obj.id = parseInt(obj.id);
+
+  // set level
+  this.player_level(obj.id);
+
+  // add to state objects
+  state_ref.players[obj.id] = obj;
+
+  return obj;
+};
+
+/* Remove player
+	---------------------------------------- */
+
+core.prototype.remove_player = function(player_id) {
+  if (!this.state.players[player_id]) {
+    return;
+  }
+
+  delete this.state.objects["player-" + player_id];
+  delete this.state.players[player_id];
+};
+
+/* Start the player
+	---------------------------------------- */
+
+core.prototype.init_player = function(player_id, state) {
+  player_id = parseInt(player_id);
+  var player = this.state.players[player_id];
+  if (!player) {
+    return;
+  }
+
+  // player values
+  player.level = 0;
+  player.score = 0;
+  player.dead = false;
+  player.health = this.scheme.levels.health[0];
+  player.cooldown = 0;
+  player.events = [];
+
+  // armoury
+  var armoury = {};
+  for (var key in this.scheme.weapons) {
+    armoury[key] = this.scheme.weapons[key].start_count;
+  }
+  player.armoury = armoury;
+
+  // merge with an external state
+  if (state) {
+    this.state.players[player_id] = deepmerge(player, state);
+  }
+
+  // set level
+  this.player_level(player_id);
+
+  // object values
+  var obj = this.state.objects["player-" + player_id];
+  if (!obj) {
+    return;
+  }
+  if (this.scheme.spawn.length > 0) {
+    var pos = this.scheme.spawn[rand(0, this.scheme.spawn.length)];
+  } else {
+    var pos = this.map.air_find_spot();
+  }
+  obj.type = "player";
+  obj.grounded = false;
+  obj.x = pos.x;
+  obj.y = pos.y;
+  obj.speed_x = 0;
+  obj.speed_y = 0;
+  obj.c = this.c.objects["player"];
+};
+
+/* Update armoury
+	---------------------------------------- */
+
+core.prototype.update_player_armoury = function(player_id, weapon, count) {
+  var player = this.state.players[player_id];
+  if (!player) {
+    return;
+  }
+
+  // if infinite or if zero and taking away
+  var old_count = player.armoury[weapon];
+  if (!is_numeric(old_count)) {
+    return false;
+  }
+  if (old_count === -1) {
+    return true;
+  }
+  if (old_count === 0 && count < 1) {
+    return false;
+  }
+
+  // if infinite
+  if (count === "infinite") {
+    player.armoury[weapon] = -1;
+  } else {
+    player.armoury[weapon] += count;
+  }
+
+  // record event
+  this.state.events.push({
+    type: "armoury",
+    player_id: player_id,
+    weapon: weapon
+  });
+
+  return true;
+};
+
+/* Add health to player
+	---------------------------------------- */
+
+core.prototype.player_health_add = function(player_id, health, no_message) {
+  var player = this.state.players[player_id];
+  if (!player || player.dead) {
+    return;
+  }
+
+  // no health enabled
+  if (!this.scheme.health) {
+    return;
+  }
+
+  // add it
+  player.health += health;
+  player.health = min(player.health, this.scheme.levels.health[player.level]);
+
+  // are we dead
+  if (player.health <= 0) {
+    this.player_die(player_id);
+  }
+
+  // set event
+  if (!no_message) {
+    this.state.events.push({
+      type: "player_health",
+      id: player_id,
+      health: health
+    });
+  }
+};
+
+/* Add score to player
+	---------------------------------------- */
+
+core.prototype.player_score_add = function(player_id, score) {
+  var player = this.state.players[player_id];
+  if (!player || player.dead) {
+    return;
+  }
+
+  // add it
+  player.score += score;
+
+  // set level
+  this.player_level(player_id);
+
+  // set event
+  this.state.events.push({
+    type: "player_score",
+    id: player_id,
+    score: score
+  });
+};
+
+/* Set player level
+	---------------------------------------- */
+
+core.prototype.player_level = function(player_id) {
+  var player = this.state.players[player_id];
+  if (!player || player.dead) {
+    return;
+  }
+
+  // go through levels
+  var level = 0;
+  for (var i = 0; i < this.scheme.levels.score.length; i++) {
+    if (this.scheme.levels.score[i] <= player.score) {
+      level = i;
+    }
+  }
+  player.level = level;
+};
+
+/* Player die
+	---------------------------------------- */
+
+core.prototype.player_die = function(player_id) {
+  var player = this.state.players[player_id];
+  if (!player || player.dead) {
+    return;
+  }
+
+  player.dead = true;
+
+  var obj = this.state.objects["player-" + player_id];
+  obj.type = "player_missile";
+  obj.c = this.c.objects["player_missile"];
+
+  // figure out gems to spawn
+  var n = max(round(player.score / 2), 3);
+  var gems = [];
+  while (n > 200) {
+    gems.push(200);
+    n -= 200;
+  }
+  while (n > 50) {
+    gems.push(50);
+    n -= 50;
+  }
+  while (n > 20) {
+    gems.push(20);
+    n -= 20;
+  }
+  while (n > 5) {
+    gems.push(5);
+    n -= 5;
+  }
+  while (n > 1) {
+    gems.push(1);
+    n -= 1;
+  }
+
+  // spawn them
+  var angle_inc = round(360 / gems.length);
+  for (var i = 0; i < gems.length; i++) {
+    var n = ((i % 3) + 1) * 2;
+    var xy = xy_speed(angle_inc * i, n);
+    this.create_object({
+      type: "gem-" + gems[i],
+      player_id: obj.player_id,
+      x: obj.x,
+      y: obj.y,
+      speed_x: xy.x.fixed(),
+      speed_y: xy.y.fixed(),
+      data: i + 1
+    });
+  }
+};
+
+/* Run through players
+	---------------------------------------- */
+
+core.prototype.frame_players = function(ignore) {
+  // run through all objects
+  for (var key in this.state.players) {
+    if (parseInt(key) !== ignore) {
+      this.frame_player(this.state.players[key]);
+    }
+  }
+};
+
+core.prototype.frame_player = function(player) {
+  if (!player) {
+    return;
+  }
+
+  // cooldown
+  if (player.cooldown > 0) {
+    player.cooldown--;
+  }
+
+  // hit
+  if (player.hit > 0) {
+    player.hit--;
+  }
+
+  // health regen
+  if (this.state.frame % 24 === 0) {
+    if (player.health < this.scheme.levels.health[player.level]) {
+      this.player_health_add(player.id, 2, true);
+    }
+  }
+
+  // remove old events
+  for (var i = 0; i < player.events.length; i++) {
+    if (this.state.frame > player.events[i].frame + 18) {
+      player.events.splice(i, 1);
+    }
+  }
+};
+
+/* Run through player locked objects
+	---------------------------------------- */
+
+core.prototype.frame_player_lock = function(player) {
+  var player_obj = this.state.objects["player-" + player.id];
+  var obj = this.state.objects[player.locked];
+  if (player_obj && obj) {
+    player_obj.x = obj.x;
+    player_obj.y = obj.y;
+    player_obj.speed_x = obj.speed_x;
+    player_obj.speed_y = obj.speed_y;
+  } else {
+    player.locked = "";
+  }
+};
+
+/* Get damage modifiers from player
+	---------------------------------------- */
+
+core.prototype.get_damage = function(obj) {
+  var damage = obj.c.damage;
+  var player = this.state.players[obj.player_id];
+  if (player && damage !== 0 && !obj.c.ignore_level_damage) {
+    var level = this.scheme.levels.damage[player.level];
+    if (level) {
+      damage += level;
+    }
+  }
+  return damage;
+};
+
+/* ========================================================================
+    State management
+ ========================================================================== */
+
+/* Get state
+	---------------------------------------- */
+
+core.prototype.pack_state = function(state) {
+  // players
+  var players = [];
+  for (var id in state.players) {
+    players.push(this.pack_player(state.players[id]));
+  }
+
+  // go through objects
+  var objects = [];
+  for (var key in state.objects) {
+    objects.push(this.pack_object(state.objects[key]));
+  }
+
+  // go through explosions
+  var explosions = [];
+  for (key in state.explosions) {
+    explosions.push(this.pack_explosion(state.explosions[key]));
+  }
+
+  return (
+    players.join("#") + "+" + objects.join("#") + "+" + explosions.join("#")
+  );
+};
+
+/* Set state
+	---------------------------------------- */
+
+core.prototype.unpack_state = function(str) {
+  // blank state
+  var state = this.blank_state();
+
+  // run through state string
+  var split = str.split("+");
+  for (var i = 0; i < split.length; i++) {
+    if (split[i]) {
+      var split2 = split[i].split("#");
+      for (var j = 0; j < split2.length; j++) {
+        if (i == 0) {
+          this.unpack_player(state, split2[j]);
+        }
+        if (i == 1) {
+          this.unpack_object(state, split2[j]);
+        }
+        if (i == 2) {
+          this.unpack_explosion(state, split2[j]);
+        }
+      }
+    }
+  }
+
+  return state;
+};
+
+/* Players
+	---------------------------------------- */
+
+core.prototype.pack_player = function(obj) {
+  // prep basic values
+  var dead = obj.dead ? "1" : "";
+  var weapon = this.armoury_refs.indexOf(obj.weapon);
+
+  // prep armoury
+  var armoury = [];
+  for (var key in obj.armoury) {
+    armoury.push(obj.armoury[key]);
+  }
+  armoury = armoury.join("$");
+
+  // prep events
+  var events = [];
+  for (var i = 0; i < obj.events.length; i++) {
+    var event = obj.events[i];
+    if (event.type === "walk") {
+      events.push(event.frame + "~0");
+    }
+    if (event.type === "jump") {
+      events.push(event.frame + "~1");
+    }
+    if (event.type === "shoot") {
+      events.push(event.frame + "~2~" + event.obj + "~" + event.weapon);
+    }
+    if (event.type === "crate") {
+      events.push(event.frame + "~3~" + event.obj);
+    }
+    if (event.type === "medpack") {
+      events.push(event.frame + "~4~" + event.obj);
+    }
+    if (event.type === "gem") {
+      events.push(event.frame + "~5~" + event.obj);
+    }
+  }
+  events = events.join("$");
+
+  // return player string
+  var arr = [
+    obj.id,
+    obj.level,
+    obj.score,
+    dead,
+    obj.health,
+    obj.cooldown,
+    obj.hit,
+    obj.locked,
+    armoury,
+    weapon,
+    events
+  ];
+  return arr.join("/");
+};
+
+core.prototype.unpack_player = function(state, str) {
+  var split = str.split("/");
+  var props = {};
+  props.id = parseInt(split[0]);
+  props.level = parseInt(split[1]);
+  props.score = parseInt(split[2]);
+  props.dead = split[3] === "1" ? true : false;
+  props.health = parseInt(split[4]);
+  props.cooldown = parseInt(split[5]);
+  props.hit = parseInt(split[6]);
+  props.locked = split[7];
+
+  // prep armoury
+  props.armoury = {};
+  var split2 = split[8].split("$");
+  for (var i = 0; i < split2.length; i++) {
+    var key = this.armoury_refs[i];
+    props.armoury[key] = parseInt(split2[i]);
+  }
+
+  // weapon
+  var wep = parseInt(split[9]);
+  if (wep !== -1) {
+    props.weapon = this.armoury_refs[wep];
+  }
+
+  // prep events
+  props.events = [];
+  var split2 = split[10].split("$");
+  for (var i = 0; i < split2.length; i++) {
+    var split3 = split2[i].split("~");
+    var obj = { frame: parseInt(split3[0]) };
+    if (split3[1] === "0") {
+      obj.type = "walk";
+    }
+    if (split3[1] === "1") {
+      obj.type = "jump";
+    }
+    if (split3[1] === "2") {
+      obj.type = "shoot";
+      obj.obj = split3[2];
+      obj.weapon = split3[3];
+    }
+    if (split3[1] === "3") {
+      obj.type = "crate";
+      obj.obj = split3[2];
+    }
+    if (split3[1] === "4") {
+      obj.type = "medpack";
+      obj.obj = split3[2];
+    }
+    if (split3[1] === "5") {
+      obj.type = "gem";
+      obj.obj = split3[2];
+    }
+    if (obj) {
+      props.events.push(obj);
+    }
+  }
+
+  // make it
+  this.create_player(props, state);
+};
+
+/* Objects
+	---------------------------------------- */
+
+core.prototype.pack_object = function(obj) {
+  var grounded = obj.grounded ? "1" : "";
+  var arr = [
+    obj.type,
+    obj.player_id,
+    obj.id,
+    obj.frame,
+    grounded,
+    obj.x,
+    obj.y,
+    obj.speed_x,
+    obj.speed_y,
+    obj.data
+  ];
+  return arr.join("/");
+};
+
+core.prototype.unpack_object = function(state, str) {
+  var split = str.split("/");
+  var props = {};
+  props.type = split[0];
+  props.player_id = parseInt(split[1]);
+  props.id = split[2];
+  props.frame = parseInt(split[3]);
+  props.grounded = split[4] === "1" ? true : false;
+  props.x = parseFloat(split[5]);
+  props.y = parseFloat(split[6]);
+  props.speed_x = parseFloat(split[7]);
+  props.speed_y = parseFloat(split[8]);
+  props.data = split[9];
+
+  this.create_object(props, state);
+};
+
+/* Explosions
+	---------------------------------------- */
+
+core.prototype.pack_explosion = function(obj) {
+  var arr = [
+    obj.player_id,
+    obj.frame,
+    obj.x,
+    obj.y,
+    obj.parent,
+    obj.parent_type
+  ];
+  return arr.join("/");
+};
+
+core.prototype.unpack_explosion = function(state, str) {
+  var split = str.split("/");
+  var props = {};
+  props.player_id = parseInt(split[0]);
+  props.frame = parseInt(split[1]);
+  props.x = parseFloat(split[2]);
+  props.y = parseFloat(split[3]);
+  props.parent = split[4];
+  props.parent_type = split[5];
+
+  this.create_explosion(props, state);
 };
 
 var config = config || {};
@@ -2710,2242 +4332,6 @@ for (key in config.weapons) {
   });
 }
 
-/* ========================================================================
-    Actions
- ========================================================================== */
-
-/* Perform action
-	---------------------------------------- */
-
-core.prototype.action = function(player_id, action) {
-  var response = { success: false };
-  var player = this.state.players[player_id];
-  var obj = this.state.objects["player-" + player_id];
-  if (!player || !action || !obj) {
-    return response;
-  }
-
-  var locked_obj = this.state.objects[player.locked];
-
-  // players can do stuff
-  if (!player.dead && !locked_obj && player.hit === 0) {
-    // run them
-    if (action.action === "move") {
-      response = this.action_move(response, player, obj, action);
-    }
-    if (action.action === "jump") {
-      response = this.action_jump(response, player, obj, action);
-    }
-    if (action.action === "shoot") {
-      response = this.action_shoot(response, player, obj, action);
-    }
-  }
-
-  response.x = obj.x;
-  response.y = obj.y;
-  response.speed_x = obj.speed_x;
-  response.speed_y = obj.speed_y;
-  response.frame = this.state.frame;
-
-  // return status
-  return response;
-};
-
-/* Walking
-	---------------------------------------- */
-
-core.prototype.action_move = function(response, player, obj, action) {
-  response.type = "walk";
-
-  if (obj.grounded) {
-    var speed = this.scheme.levels.speed[player.level] || obj.c.speed.move;
-    var speed = action.speed || speed;
-    var walk = this.map.walk(obj.x, obj.y, obj.x, obj.y, action.angle, speed);
-    if (walk.move) {
-      if (this.action_walk_move(obj, walk.path)) {
-        // record player event
-        player.events.push({ frame: this.state.frame, type: "walk" });
-
-        // return success
-        response.success = true;
-      }
-    }
-  }
-
-  return response;
-};
-
-/* Walking in a direction
-	---------------------------------------- */
-
-core.prototype.action_walk_dir = function(obj, dir, speed) {
-  var speed = speed || obj.c.speed.move;
-
-  // get initial path
-  var walk = this.map.walk(obj.x, obj.y, obj.x, obj.y, 0, speed);
-
-  if (walk.direction != dir) {
-    walk = this.map.walk(obj.x, obj.y, obj.x, obj.y, 180, speed);
-    if (walk.direction != dir) {
-      walk = this.map.walk(obj.x, obj.y, obj.x, obj.y, 90, speed);
-      if (walk.direction != dir) {
-        walk = this.map.walk(obj.x, obj.y, obj.x, obj.y, 270, speed);
-        if (walk.direction != dir) {
-          return;
-        }
-      }
-    }
-  }
-  if (!walk.move) {
-    return;
-  }
-
-  this.action_walk_move(obj, walk.path);
-};
-
-/* Walk moving
-	---------------------------------------- */
-
-core.prototype.action_walk_move = function(obj, path) {
-  // go through the course
-  var x1 = obj.x;
-  var y1 = obj.y;
-  for (var i = 1; i < path.length; i++) {
-    var point = path[i];
-
-    // check object collisions
-    var col = this.collisions(obj, point.x, point.y);
-    if (col) {
-      return;
-    }
-
-    obj.x = point.x;
-    obj.y = point.y;
-    obj.moved = true;
-  }
-
-  if (obj.moved) {
-    return true;
-  }
-};
-
-/* Jumping
-	---------------------------------------- */
-
-core.prototype.action_jump = function(response, player, obj, action) {
-  response.type = "jump";
-
-  if (obj.grounded && player.cooldown === 0) {
-    var speed = this.scheme.levels.jump[player.level] || obj.c.speed.jump;
-    var xy = xy_speed(action.angle, speed);
-    obj.speed_x = xy.x.fixed();
-    obj.speed_y = xy.y.fixed();
-    if (this.physics_move(obj)) {
-      // set grounding
-      obj.grounded = false;
-
-      // set cooldown
-      player.cooldown = 7;
-
-      // record player event
-      player.events.push({ frame: this.state.frame, type: "jump" });
-
-      // return success
-      response.success = true;
-    }
-  }
-
-  return response;
-};
-
-/* Shooting weapon
-	---------------------------------------- */
-
-core.prototype.action_shoot = function(response, player, obj, action) {
-  response.type = "shoot";
-
-  // if waiting for cooldown
-  // is not real weapon
-  // do we need to walk
-  // check armoury count
-  var weapon = this.c.weapons[action.weapon];
-  if (
-    (player.cooldown === 0 && !weapon) ||
-    (weapon.require_walk && !obj.grounded) ||
-    player.armoury[action.weapon] === 0
-  ) {
-    return response;
-  }
-
-  // crate the object
-  var speed = xy_speed(action.angle, weapon.speed);
-  var shot_obj = this.create_object({
-    type: weapon.object,
-    player_id: player.id,
-    x: obj.x,
-    y: obj.y,
-    speed_x: (speed.x + obj.speed_x * weapon.inertia).fixed(),
-    speed_y: (speed.y + obj.speed_y * weapon.inertia).fixed()
-  });
-
-  // set player recoil
-  if (!obj.grounded) {
-    obj.speed_x += (-speed.x * weapon.recoil).fixed();
-    obj.speed_y += (-speed.y * weapon.recoil).fixed();
-  }
-
-  // set armoury values
-  this.update_player_armoury(player.id, action.weapon, -1);
-
-  // set cooldown
-  player.cooldown = weapon.cooldown;
-
-  // set player lock
-  if (shot_obj.c.player_lock) {
-    player.locked = shot_obj.key;
-  }
-
-  // record player event
-  player.events.push({
-    frame: this.state.frame,
-    type: "shoot",
-    obj: shot_obj.key,
-    weapon: action.weapon
-  });
-
-  // return success
-  response.success = true;
-  return response;
-};
-
-/* ========================================================================
-    Collisions
- ========================================================================== */
-
-/* Run single collision check
-	---------------------------------------- */
-
-core.prototype.collisions = function(obj, x, y) {
-  // check collision with ground
-  if (this.map.i(round(x), round(y))) {
-    var event = this.event(obj, "ground", null);
-    if (event) {
-      return event;
-    }
-  }
-
-  // check collisions with other objects
-  for (var key in this.state.objects) {
-    if (obj.key === key) {
-      continue;
-    }
-    if (this.collision_obj(obj, x, y, this.state.objects[key])) {
-      return true;
-    }
-  }
-
-  return false;
-};
-
-/* Run object collision check
-	---------------------------------------- */
-
-core.prototype.collision_obj = function(obj, x, y, check_obj) {
-  // if no collision
-  if (
-    this.collision_check(
-      x,
-      y,
-      check_obj.x,
-      check_obj.y,
-      obj.c.size,
-      check_obj.c.size
-    )
-  ) {
-    return;
-  }
-
-  // prevent hits on parent players for a short time or if they're player locked
-  if (
-    check_obj.type === "player" &&
-    check_obj.player_id === obj.player_id &&
-    (this.state.frame < obj.frame + 15 || obj.c.player_lock)
-  ) {
-    return;
-  }
-
-  // prevent clusters hitting each other for a short time
-  if (
-    check_obj.frame === obj.frame &&
-    check_obj.player_id === obj.player_id &&
-    this.state.frame < obj.frame + 60
-  ) {
-    return;
-  }
-
-  // trigger basic object collision event
-  if (this.event(obj, "object", check_obj)) {
-    return true;
-  }
-
-  // trigger specific object collision event
-  var event = obj.c.object_events[check_obj.type];
-  if (event) {
-    if (this.run_event(obj, event, check_obj)) {
-      return true;
-    }
-  }
-};
-
-/* Collision Maths
-	---------------------------------------- */
-
-core.prototype.collision_check = function(x1, y1, x2, y2, s1, s2) {
-  return this.map.get_distance(x1, y1, x2, y2) > s1 + s2;
-};
-
-/* ========================================================================
-    Core
- ========================================================================== */
-
-/* create core object
-	---------------------------------------- */
-
-function core(config, scheme, map, gravity_map) {
-  // config
-  this.c = config;
-  this.scheme = scheme;
-  this.map = new core_map(map, scheme, gravity_map);
-
-  // crate chance table
-  this.crate_list = [];
-  for (var key in this.scheme.weapons) {
-    for (var i = 0; i < this.scheme.weapons[key].crate_chance; i++) {
-      this.crate_list.push(key);
-    }
-  }
-
-  // armoury reference table
-  this.armoury_refs = [];
-  for (key in this.scheme.weapons) {
-    this.armoury_refs.push(key);
-  }
-}
-
-/* Set a blank state
-	---------------------------------------- */
-
-core.prototype.blank_state = function() {
-  return {
-    frame: 0,
-    explosions: {},
-    objects: {},
-    players: {},
-    events: []
-  };
-};
-
-/* Run every frame
-	---------------------------------------- */
-
-core.prototype.frame = function() {
-  this.frame_explosions();
-  this.frame_players();
-  this.frame_objects();
-};
-
-/* ========================================================================
-    Events
- ========================================================================== */
-
-/* Run a specific type of event
-	---------------------------------------- */
-
-core.prototype.event = function(obj, type, collided_obj) {
-  var event = obj.c.events[type];
-  if (!event) {
-    return;
-  }
-  return this.run_event(obj, event, collided_obj, type);
-};
-
-/* Run a specific event
-	---------------------------------------- */
-
-core.prototype.run_event = function(obj, event, collided_obj, type) {
-  // handle arrays of events
-  if (Array.isArray(event)) {
-    var stop = false;
-    for (var i = 0; i < event.length; i++) {
-      var stop2 = this.run_event(obj, event[i], collided_obj, type);
-      stop = stop2 ? true : stop;
-    }
-    return stop;
-  }
-
-  // run event function
-  if (event === "die") {
-    return this.event_die(obj, collided_obj, type);
-  } else if (event === "kill") {
-    return this.event_kill(obj, collided_obj);
-  } else if (event === "explode") {
-    return this.event_explode(obj);
-  } else if (event === "hit_give") {
-    return this.event_hit_give(obj, collided_obj, type);
-  } else if (event === "hit_receive") {
-    return this.event_hit_receive(obj, collided_obj, type);
-  } else if (event === "destroy") {
-    return this.event_destroy(obj);
-  } else if (event === "cluster") {
-    return this.event_cluster(obj);
-  } else if (event === "bounce") {
-    return this.event_bounce(obj, collided_obj, type);
-  } else if (event === "bounce_explode") {
-    return this.event_bounce_explode(obj, collided_obj, type);
-  } else if (event === "stick") {
-    return this.event_stick(obj);
-  } else if (event === "slide") {
-    return this.event_slide(obj);
-  } else if (event === "player_bounce") {
-    return this.event_player_bounce(obj, collided_obj, type);
-  } else if (event === "drag_player") {
-    return this.event_drag_player(obj);
-  } else if (event === "spawn_ghost") {
-    return this.event_spawn_ghost(obj);
-  } else if (event === "collect") {
-    return this.event_collect(obj, collided_obj);
-  }
-};
-
-/* Object die
-	---------------------------------------- */
-
-core.prototype.event_die = function(obj, collided_obj, type) {
-  // die event
-  this.event(obj, "die");
-
-  // check for destroy events
-  if (this.scheme.events.destroy) {
-    if (this.scheme.events.destroy[obj.id]) {
-      this.state.events.push(this.scheme.events.destroy[obj.id]);
-    }
-  }
-
-  // delete the object
-  delete this.state.objects[obj.key];
-
-  return true;
-};
-
-/* Object kill
-	---------------------------------------- */
-
-core.prototype.event_kill = function(obj, collided_obj) {
-  // destroy it
-  this.run_event(collided_obj, "die");
-};
-
-/* Explode
-	---------------------------------------- */
-
-core.prototype.event_explode = function(obj) {
-  // create explosion object
-  this.create_explosion({
-    player_id: obj.player_id,
-    x: obj.x,
-    y: obj.y,
-    parent: obj.key,
-    parent_type: obj.type
-  });
-};
-
-/* Give a hit
-	---------------------------------------- */
-
-core.prototype.event_hit_give = function(obj, collided_obj, type) {
-  return this.run_event(collided_obj, "hit_receive", obj, type);
-};
-
-/* Receive a hit
-	---------------------------------------- */
-
-core.prototype.event_hit_receive = function(obj, collided_obj, type) {
-  // prevent instant hits
-  if (obj.hits) {
-    for (var key in obj.hits) {
-      if (key === collided_obj.key) {
-        return;
-      }
-    }
-  }
-
-  // calculate direction and distance it came from
-  var angle = this.map.get_heading(
-    obj.x,
-    obj.y,
-    collided_obj.x,
-    collided_obj.y
-  );
-  var distance = this.map.get_distance(
-    obj.x,
-    obj.y,
-    collided_obj.x,
-    collided_obj.y
-  );
-
-  // get damage values from collided object
-  var damage = this.get_damage(collided_obj);
-  var knock = collided_obj.c.knock;
-  if (collided_obj.type === "explosion") {
-    damage *= max(0, (damage * 2 - distance) / (damage * 2));
-  }
-
-  // ignore if there's no damage
-  if (damage === 0) {
-    return;
-  }
-
-  // knock object
-  if (knock > 0) {
-    var xy = xy_speed(angle, damage);
-    obj.speed_x -= xy.x.fixed();
-    obj.speed_y -= xy.y.fixed();
-    obj.grounded = false;
-  }
-
-  // are we hitting player
-  if (obj.type === "player") {
-    this.player_health_add(obj.player_id, -round(damage));
-    var player = this.state.players[obj.player_id];
-    if (player) {
-      player.hit = damage * 2;
-    }
-  }
-
-  // sound effect
-  if (collided_obj.c.audio.hit) {
-    this.state.events.push({
-      type: "sound",
-      x: obj.x,
-      y: obj.y,
-      sound: collided_obj.c.audio.hit
-    });
-  }
-
-  // set hits
-  if (!obj.hits) {
-    obj.hits = {};
-  }
-  obj.hits[collided_obj.key] = true;
-};
-
-/* Destroy ground
-	---------------------------------------- */
-
-core.prototype.event_destroy = function(obj) {
-  // limit to once per frame
-  if (obj.destroyed) {
-    return;
-  }
-  obj.destroyed = true;
-
-  var damage = this.get_damage(obj);
-
-  // record ground damage
-  this.state.events.push({
-    type: "ground_damage",
-    frame: this.state.frame,
-    dig: true,
-    x: obj.x,
-    y: obj.y,
-    radius: damage
-  });
-};
-
-/* Object bounce
-	---------------------------------------- */
-
-core.prototype.event_bounce = function(obj, collided_obj, type) {
-  // if grounded dont do anything
-  if (obj.grounded) {
-    return true;
-  }
-
-  // check speed
-  var speed = get_speed(obj.speed_x, obj.speed_y);
-  var check_speed = speed * obj.c.bounce;
-  if (check_speed < 1) {
-    obj.speed_x = 0;
-    obj.speed_y = 0;
-    return true;
-  }
-
-  // get new direction angle
-  var direction = get_angle(obj.speed_x, obj.speed_y);
-  var surface_angle = 0;
-
-  // get angle from ground
-  if (type === "ground") {
-    var walk = this.map.walk(round(obj.x), round(obj.y), 0, 0, direction, 6);
-    if (walk.move) {
-      surface_angle = walk.angle;
-    }
-  }
-
-  // get angle from object
-  else {
-    var heading = this.map.get_heading(
-      obj.x,
-      obj.y,
-      collided_obj.x,
-      collided_obj.y
-    );
-    surface_angle = angle_add(heading, 90);
-  }
-
-  // reflect direction angle with collision angle
-  var reflection = (direction - surface_angle) * 2;
-  var new_angle = angle_add(direction, -reflection);
-
-  // transform main velocity towards new angle
-  var new_speed = xy_speed(new_angle, check_speed);
-  obj.speed_x = new_speed.x.fixed();
-  obj.speed_y = new_speed.y.fixed();
-
-  // record bounce event
-  if (speed > 2) {
-    this.state.events.push({
-      type: "bounce",
-      x: obj.x,
-      y: obj.y,
-      obj: obj.key
-    });
-  }
-
-  return true;
-};
-
-/* Object stick to ground
-	---------------------------------------- */
-
-core.prototype.event_stick = function(obj) {
-  obj.grounded = true;
-  obj.speed_x = 0;
-  obj.speed_y = 0;
-  return true;
-};
-
-/* Object slide
-	---------------------------------------- */
-
-core.prototype.event_slide = function(obj) {
-  var angle = get_angle(obj.speed_x, obj.speed_y);
-  var walk = this.map.walk(obj.x, obj.y, obj.x, obj.y, angle, obj.speed_left);
-  if (walk.move) {
-    this.action_walk_move(obj, walk.path);
-  }
-  return true;
-};
-
-/* Player bounce
-	---------------------------------------- */
-
-core.prototype.event_player_bounce = function(obj, collided_obj, type) {
-  // if grounded dont do anything
-  if (obj.grounded) {
-    return true;
-  }
-
-  var player = this.state.players[obj.player_id];
-  if (!player) {
-    return;
-  }
-  var speed = get_speed(obj.speed_x, obj.speed_y);
-
-  var max_speed = this.scheme.levels.jump[player.level] || 0;
-  max_speed += 10;
-  if (player.hit > 0 || speed > max_speed) {
-    return this.run_event(obj, "bounce", collided_obj, type);
-  } else {
-    return this.run_event(obj, "stick");
-  }
-};
-
-/* Drag player
-	---------------------------------------- */
-
-core.prototype.event_drag_player = function(obj) {
-  var player_obj = this.state.objects["player-" + obj.player_id];
-  if (!player_obj) {
-    return;
-  }
-
-  player_obj.speed_x = obj.speed_x;
-  player_obj.speed_y = obj.speed_y;
-  player_obj.dragged = true;
-};
-
-/* First Destroy
-	---------------------------------------- */
-
-core.prototype.event_bounce_explode = function(obj, collided_obj, type) {
-  if (obj.frame + 10 > this.state.frame) {
-    return this.run_event(obj, "bounce", collided_obj, type);
-  } else {
-    return this.run_event(obj, "explode");
-  }
-};
-
-/* Spawn player ghost
-	---------------------------------------- */
-
-core.prototype.event_spawn_ghost = function(obj) {
-  // transform object into ghost
-  obj.type = "player_ghost";
-  obj.c = this.c.objects["player_ghost"];
-  obj.speed_x = 0;
-  obj.speed_y = 0;
-};
-
-/* Clusters
-	---------------------------------------- */
-
-core.prototype.event_cluster = function(obj) {
-  // set off explosions
-  this.run_event(obj, "explode");
-
-  // get cluster constants
-  var cluster = obj.c.cluster;
-
-  // get opposite angle of gravity
-  var angle = this.map.get_gravity_angle(obj.x, obj.y);
-  angle = angle_add(angle, 135);
-
-  // go through clusters
-  var range = cluster.circle ? 360 - 360 / cluster.count : 90;
-  var angle_diff = range / (cluster.count - 1);
-  for (var i = 0; i < cluster.count; i++) {
-    // create cluster objects
-    var launch_angle = angle_add(angle, i * angle_diff);
-    var speed = xy_speed(launch_angle, cluster.speed);
-
-    // create cluster object
-    this.create_object({
-      type: cluster.object,
-      id: obj.id,
-      data: i + 1,
-      player_id: obj.player_id,
-      x: obj.x,
-      y: obj.y,
-      speed_x: speed.x.fixed(),
-      speed_y: speed.y.fixed()
-    });
-  }
-
-  return true;
-};
-
-/* Collect Crate
-	---------------------------------------- */
-
-core.prototype.event_collect = function(obj, collided_obj) {
-  // prep event to send to game
-  var event = {
-    type: "collect",
-    obj: collided_obj.key,
-    player_id: obj.player_id
-  };
-  var player = this.state.players[obj.player_id];
-  if (!player) {
-    return;
-  }
-
-  // crate
-  if (collided_obj.type === "crate") {
-    var count = this.scheme.weapons[collided_obj.data].crate_count;
-    count = count === -1 ? "infinite" : count;
-    this.update_player_armoury(obj.player_id, collided_obj.data, count);
-    event.collected = "crate";
-    event.weapon = collided_obj.data;
-    event.count = count;
-    player.events.push({
-      frame: this.state.frame,
-      type: "crate",
-      obj: collided_obj.key
-    });
-  }
-
-  // medpack
-  else if (collided_obj.type === "medpack") {
-    this.player_health_add(obj.player_id, this.scheme.drops.medpack.add);
-    event.collected = "medpack";
-    player.events.push({
-      frame: this.state.frame,
-      type: "medpack",
-      obj: collided_obj.key
-    });
-  }
-
-  // gems
-  else if (collided_obj.type === "gem-1") {
-    this.player_score_add(obj.player_id, 1);
-    event.collected = "gem";
-    event.n = 1;
-    player.events.push({
-      frame: this.state.frame,
-      type: "gem",
-      obj: collided_obj.key
-    });
-  } else if (collided_obj.type === "gem-5") {
-    this.player_score_add(obj.player_id, 5);
-    event.collected = "gem";
-    event.n = 5;
-    player.events.push({
-      frame: this.state.frame,
-      type: "gem",
-      obj: collided_obj.key
-    });
-  } else if (collided_obj.type === "gem-20") {
-    this.player_score_add(obj.player_id, 20);
-    event.collected = "gem";
-    event.n = 20;
-    player.events.push({
-      frame: this.state.frame,
-      type: "gem",
-      obj: collided_obj.key
-    });
-  } else if (collided_obj.type === "gem-50") {
-    this.player_score_add(obj.player_id, 50);
-    event.collected = "gem";
-    event.n = 50;
-    player.events.push({
-      frame: this.state.frame,
-      type: "gem",
-      obj: collided_obj.key
-    });
-  } else if (collided_obj.type === "gem-200") {
-    this.player_score_add(obj.player_id, 200);
-    event.collected = "gem";
-    event.n = 200;
-    player.events.push({
-      frame: this.state.frame,
-      type: "gem",
-      obj: collided_obj.key
-    });
-  }
-
-  // record event
-  this.state.events.push(event);
-
-  // kill object
-  this.run_event(collided_obj, "die", obj, "collect");
-
-  // check for collection events
-  if (this.scheme.events.collect) {
-    if (this.scheme.events.collect[collided_obj.id]) {
-      this.state.events.push(this.scheme.events.collect[collided_obj.id]);
-    }
-  }
-
-  return false;
-};
-
-/* ========================================================================
-    Explosions
- ========================================================================== */
-
-/* Create an explosion
-	---------------------------------------- */
-
-core.prototype.create_explosion = function(props, state) {
-  var state_ref = state || this.state;
-
-  var obj = {
-    type: "explosion",
-    player_id: "",
-    frame: state_ref.frame,
-    x: 0,
-    y: 0,
-    parent: "",
-    parent_type: ""
-  };
-  obj = deepmerge(obj, props);
-  obj.c = this.c.objects[obj.parent_type];
-
-  // add to state objects
-  state_ref.explosions[obj.parent] = obj;
-};
-
-/* Check all existing explosions
-	---------------------------------------- */
-
-core.prototype.frame_explosions = function() {
-  // go through all explosions
-  for (var key in this.state.explosions) {
-    var explode = this.state.explosions[key];
-
-    // if expired remove
-    if (this.state.frame > explode.frame + 40) {
-      delete this.state.explosions[key];
-    }
-
-    // if exploding this frame run
-    if (this.state.frame === explode.frame + 1) {
-      this.run_explosion(explode);
-    }
-  }
-};
-
-/* Run an explosion
-	---------------------------------------- */
-
-core.prototype.run_explosion = function(explode) {
-  // if no damage
-  if (!explode.c.damage) {
-    return;
-  }
-
-  // calculate additional player damage
-  var damage = this.get_damage(explode);
-
-  // check collisions
-  for (key in this.state.objects) {
-    var obj = this.state.objects[key];
-
-    // if object was just made
-    if (this.state.frame < obj.frame + 2) {
-      continue;
-    }
-
-    // run collision check
-    if (
-      !this.collision_check(
-        obj.x,
-        obj.y,
-        explode.x,
-        explode.y,
-        obj.c.size,
-        damage * 2
-      )
-    ) {
-      this.event(obj, "explosion", explode);
-    }
-  }
-
-  // record ground damage
-  var ptype = this.c.objects[explode.parent_type];
-  if (ptype && ptype.destroy_ground) {
-    this.state.events.push({
-      type: "ground_damage",
-      frame: this.state.frame,
-      x: explode.x,
-      y: explode.y,
-      radius: damage
-    });
-  }
-};
-
-/* ========================================================================
-    Objects
- ========================================================================== */
-
-/* Create a new game object
-	---------------------------------------- */
-
-core.prototype.create_object = function(props, state) {
-  var state_ref = state || this.state;
-
-  var obj = {
-    type: "",
-    player_id: "",
-    id: "",
-    frame: state_ref.frame,
-    grounded: false,
-    x: 0,
-    y: 0,
-    speed_x: 0,
-    speed_y: 0,
-    data: ""
-  };
-  obj = deepmerge(obj, props);
-  obj.c = this.c.objects[obj.type];
-  var key_type = obj.type;
-
-  // set key
-  if (
-    obj.type === "player" ||
-    obj.type === "player_ghost" ||
-    obj.type === "player_missile"
-  ) {
-    obj.key = "player-" + obj.player_id;
-  } else {
-    obj.key =
-      obj.type +
-      "-" +
-      obj.player_id +
-      "-" +
-      obj.id +
-      "-" +
-      obj.frame +
-      "-" +
-      obj.data;
-  }
-
-  // add to state objects
-  state_ref.objects[obj.key] = obj;
-
-  // return it
-  return obj;
-};
-
-/* Snap object to another object
-	---------------------------------------- */
-
-core.prototype.snap_object = function(obj1, obj2) {
-  obj1.grounded = obj2.grounded;
-  obj1.x = obj2.x;
-  obj1.y = obj2.y;
-  obj1.speed_x = obj2.speed_x;
-  obj1.speed_y = obj2.speed_y;
-};
-
-/* Run through object frame events
-	---------------------------------------- */
-
-core.prototype.frame_objects = function() {
-  // run through all objects
-  for (var key in this.state.objects) {
-    this.frame_object(this.state.objects[key]);
-  }
-
-  // check for player lock
-  for (var key in this.state.players) {
-    this.frame_player_lock(this.state.players[key]);
-  }
-};
-
-core.prototype.frame_object = function(obj) {
-  if (!obj) {
-    return;
-  }
-  obj.destroyed = false;
-
-  // stopping
-  if (obj.c.stop > 0 && this.state.frame > obj.frame + obj.c.stop) {
-    obj.speed_x = 0;
-    obj.speed_y = 0;
-  }
-
-  // timeout
-  if (obj.c.timeout > 0 && obj.frame + obj.c.timeout <= this.state.frame) {
-    this.run_event(obj, "die");
-    return;
-  }
-
-  // run physics on object
-  this.physics(obj);
-
-  // events
-  this.event(obj, "frame");
-};
-
-/* Spawns
-	---------------------------------------- */
-
-core.prototype.spawn = function(props) {
-  // weapon crate contents
-  if (props.type == "crate") {
-    if (this.crate_list.length < 1) {
-      return;
-    }
-    props.data = this.crate_list[rand(0, this.crate_list.length)];
-  }
-
-  // do we have a set position
-  if (!props.x && !props.y) {
-    var pos = this.map.air_find_spot();
-    props.x = pos.x;
-    props.y = pos.y;
-  }
-
-  return this.create_object(props);
-};
-
-/* ========================================================================
-    Physics
- ========================================================================== */
-
-/* Run air physics
-	---------------------------------------- */
-
-core.prototype.physics = function(obj) {
-  // are we still grounded
-  if (obj.grounded) {
-    if (!this.map.ground_pixel(round(obj.x), round(obj.y))) {
-      obj.grounded = false;
-    }
-  }
-
-  // run the main physics
-  if (!obj.grounded) {
-    this.physics_gravity(obj);
-    this.physics_move(obj);
-  }
-};
-
-/* Calculate gravity
-	---------------------------------------- */
-
-core.prototype.physics_gravity = function(obj) {
-  // if no weight
-  if (obj.c.weight <= 0) {
-    return;
-  }
-
-  // get gravity values
-  var gravity = this.map.get_gravity(round(obj.x), round(obj.y));
-
-  // adjust speed
-  this.physics_adjust_speed(
-    obj,
-    gravity.x,
-    gravity.y,
-    obj.c.speed.max_gravity,
-    obj.c.weight
-  );
-};
-
-/* Adjust speed of object
-	---------------------------------------- */
-
-core.prototype.physics_adjust_speed = function(
-  obj,
-  new_speed_x,
-  new_speed_y,
-  max_speed,
-  weight
-) {
-  var angle = get_angle(new_speed_x, new_speed_y);
-  var max_speed = xy_speed(angle, max_speed);
-  var speed_add_x = new_speed_x * weight;
-  var speed_add_y = new_speed_y * weight;
-  var diff_x = max_speed.x - obj.speed_x;
-  var diff_y = max_speed.y - obj.speed_y;
-
-  // only add speed up to the limit without bringing it down
-  if (max_speed.x < 0) {
-    obj.speed_x += max(speed_add_x, min(0, diff_x));
-  } else {
-    obj.speed_x += min(speed_add_x, max(0, diff_x));
-  }
-  if (max_speed.y < 0) {
-    obj.speed_y += max(speed_add_y, min(0, diff_y));
-  } else {
-    obj.speed_y += min(speed_add_y, max(0, diff_y));
-  }
-
-  obj.speed_x = obj.speed_x.fixed();
-  obj.speed_y = obj.speed_y.fixed();
-};
-
-/* Do the movement
-	---------------------------------------- */
-
-core.prototype.physics_move = function(obj) {
-  // check speed
-  var speed_limit = check_speed(obj.speed_x, obj.speed_y, obj.c.speed.max);
-  obj.speed_x = speed_limit.x.fixed();
-  obj.speed_y = speed_limit.y.fixed();
-
-  // plot a course
-  var course = plot_course(obj.x, obj.y, obj.speed_x, obj.speed_y);
-
-  // if no course
-  if (!course.move) {
-    this.collisions(obj, obj.x, obj.y);
-    return;
-  }
-
-  // move through course
-  var moved = false;
-  for (var i = 1; i < course.points.length; i++) {
-    // remaining movement points left
-    obj.speed_left = course.points.length - i;
-
-    var point = course.points[i];
-    var nx = this.map.loop_x(round(point.x));
-    var ny = this.map.loop_y(round(point.y));
-
-    // collisions
-    var collision = this.collisions(obj, nx, ny);
-    if (collision) {
-      break;
-    }
-
-    // move object
-    obj.x = nx;
-    obj.y = ny;
-    moved = true;
-  }
-
-  return moved;
-};
-
-/* ========================================================================
-    Players
- ========================================================================== */
-
-/* Create a new player
-	---------------------------------------- */
-
-core.prototype.create_player = function(props, state) {
-  if (typeof props.id === "undefined") {
-    return;
-  }
-
-  var state_ref = state || this.state;
-
-  // set up object
-  var obj = {
-    id: "",
-    level: 0,
-    score: 0,
-    dead: false,
-    health: this.scheme.levels.health[0],
-    cooldown: 0,
-    hit: 0,
-    weapon: "",
-    locked: "",
-    events: [],
-    armoury: {}
-  };
-  obj = deepmerge(obj, props);
-  obj.id = parseInt(obj.id);
-
-  // set level
-  this.player_level(obj.id);
-
-  // add to state objects
-  state_ref.players[obj.id] = obj;
-
-  return obj;
-};
-
-/* Remove player
-	---------------------------------------- */
-
-core.prototype.remove_player = function(player_id) {
-  if (!this.state.players[player_id]) {
-    return;
-  }
-
-  delete this.state.objects["player-" + player_id];
-  delete this.state.players[player_id];
-};
-
-/* Start the player
-	---------------------------------------- */
-
-core.prototype.init_player = function(player_id, state) {
-  player_id = parseInt(player_id);
-  var player = this.state.players[player_id];
-  if (!player) {
-    return;
-  }
-
-  // player values
-  player.level = 0;
-  player.score = 0;
-  player.dead = false;
-  player.health = this.scheme.levels.health[0];
-  player.cooldown = 0;
-  player.events = [];
-
-  // armoury
-  var armoury = {};
-  for (var key in this.scheme.weapons) {
-    armoury[key] = this.scheme.weapons[key].start_count;
-  }
-  player.armoury = armoury;
-
-  // merge with an external state
-  if (state) {
-    this.state.players[player_id] = deepmerge(player, state);
-  }
-
-  // set level
-  this.player_level(player_id);
-
-  // object values
-  var obj = this.state.objects["player-" + player_id];
-  if (!obj) {
-    return;
-  }
-  if (this.scheme.spawn.length > 0) {
-    var pos = this.scheme.spawn[rand(0, this.scheme.spawn.length)];
-  } else {
-    var pos = this.map.air_find_spot();
-  }
-  obj.type = "player";
-  obj.grounded = false;
-  obj.x = pos.x;
-  obj.y = pos.y;
-  obj.speed_x = 0;
-  obj.speed_y = 0;
-  obj.c = this.c.objects["player"];
-};
-
-/* Update armoury
-	---------------------------------------- */
-
-core.prototype.update_player_armoury = function(player_id, weapon, count) {
-  var player = this.state.players[player_id];
-  if (!player) {
-    return;
-  }
-
-  // if infinite or if zero and taking away
-  var old_count = player.armoury[weapon];
-  if (!is_numeric(old_count)) {
-    return false;
-  }
-  if (old_count === -1) {
-    return true;
-  }
-  if (old_count === 0 && count < 1) {
-    return false;
-  }
-
-  // if infinite
-  if (count === "infinite") {
-    player.armoury[weapon] = -1;
-  } else {
-    player.armoury[weapon] += count;
-  }
-
-  // record event
-  this.state.events.push({
-    type: "armoury",
-    player_id: player_id,
-    weapon: weapon
-  });
-
-  return true;
-};
-
-/* Add health to player
-	---------------------------------------- */
-
-core.prototype.player_health_add = function(player_id, health, no_message) {
-  var player = this.state.players[player_id];
-  if (!player || player.dead) {
-    return;
-  }
-
-  // no health enabled
-  if (!this.scheme.health) {
-    return;
-  }
-
-  // add it
-  player.health += health;
-  player.health = min(player.health, this.scheme.levels.health[player.level]);
-
-  // are we dead
-  if (player.health <= 0) {
-    this.player_die(player_id);
-  }
-
-  // set event
-  if (!no_message) {
-    this.state.events.push({
-      type: "player_health",
-      id: player_id,
-      health: health
-    });
-  }
-};
-
-/* Add score to player
-	---------------------------------------- */
-
-core.prototype.player_score_add = function(player_id, score) {
-  var player = this.state.players[player_id];
-  if (!player || player.dead) {
-    return;
-  }
-
-  // add it
-  player.score += score;
-
-  // set level
-  this.player_level(player_id);
-
-  // set event
-  this.state.events.push({
-    type: "player_score",
-    id: player_id,
-    score: score
-  });
-};
-
-/* Set player level
-	---------------------------------------- */
-
-core.prototype.player_level = function(player_id) {
-  var player = this.state.players[player_id];
-  if (!player || player.dead) {
-    return;
-  }
-
-  // go through levels
-  var level = 0;
-  for (var i = 0; i < this.scheme.levels.score.length; i++) {
-    if (this.scheme.levels.score[i] <= player.score) {
-      level = i;
-    }
-  }
-  player.level = level;
-};
-
-/* Player die
-	---------------------------------------- */
-
-core.prototype.player_die = function(player_id) {
-  var player = this.state.players[player_id];
-  if (!player || player.dead) {
-    return;
-  }
-
-  player.dead = true;
-
-  var obj = this.state.objects["player-" + player_id];
-  obj.type = "player_missile";
-  obj.c = this.c.objects["player_missile"];
-
-  // figure out gems to spawn
-  var n = max(round(player.score / 2), 3);
-  var gems = [];
-  while (n > 200) {
-    gems.push(200);
-    n -= 200;
-  }
-  while (n > 50) {
-    gems.push(50);
-    n -= 50;
-  }
-  while (n > 20) {
-    gems.push(20);
-    n -= 20;
-  }
-  while (n > 5) {
-    gems.push(5);
-    n -= 5;
-  }
-  while (n > 1) {
-    gems.push(1);
-    n -= 1;
-  }
-
-  // spawn them
-  var angle_inc = round(360 / gems.length);
-  for (var i = 0; i < gems.length; i++) {
-    var n = ((i % 3) + 1) * 2;
-    var xy = xy_speed(angle_inc * i, n);
-    this.create_object({
-      type: "gem-" + gems[i],
-      player_id: obj.player_id,
-      x: obj.x,
-      y: obj.y,
-      speed_x: xy.x.fixed(),
-      speed_y: xy.y.fixed(),
-      data: i + 1
-    });
-  }
-};
-
-/* Run through players
-	---------------------------------------- */
-
-core.prototype.frame_players = function(ignore) {
-  // run through all objects
-  for (var key in this.state.players) {
-    if (parseInt(key) !== ignore) {
-      this.frame_player(this.state.players[key]);
-    }
-  }
-};
-
-core.prototype.frame_player = function(player) {
-  if (!player) {
-    return;
-  }
-
-  // cooldown
-  if (player.cooldown > 0) {
-    player.cooldown--;
-  }
-
-  // hit
-  if (player.hit > 0) {
-    player.hit--;
-  }
-
-  // health regen
-  if (this.state.frame % 24 === 0) {
-    if (player.health < this.scheme.levels.health[player.level]) {
-      this.player_health_add(player.id, 2, true);
-    }
-  }
-
-  // remove old events
-  for (var i = 0; i < player.events.length; i++) {
-    if (this.state.frame > player.events[i].frame + 18) {
-      player.events.splice(i, 1);
-    }
-  }
-};
-
-/* Run through player locked objects
-	---------------------------------------- */
-
-core.prototype.frame_player_lock = function(player) {
-  var player_obj = this.state.objects["player-" + player.id];
-  var obj = this.state.objects[player.locked];
-  if (player_obj && obj) {
-    player_obj.x = obj.x;
-    player_obj.y = obj.y;
-    player_obj.speed_x = obj.speed_x;
-    player_obj.speed_y = obj.speed_y;
-  } else {
-    player.locked = "";
-  }
-};
-
-/* Get damage modifiers from player
-	---------------------------------------- */
-
-core.prototype.get_damage = function(obj) {
-  var damage = obj.c.damage;
-  var player = this.state.players[obj.player_id];
-  if (player && damage !== 0 && !obj.c.ignore_level_damage) {
-    var level = this.scheme.levels.damage[player.level];
-    if (level) {
-      damage += level;
-    }
-  }
-  return damage;
-};
-
-/* ========================================================================
-    State management
- ========================================================================== */
-
-/* Get state
-	---------------------------------------- */
-
-core.prototype.pack_state = function(state) {
-  // players
-  var players = [];
-  for (var id in state.players) {
-    players.push(this.pack_player(state.players[id]));
-  }
-
-  // go through objects
-  var objects = [];
-  for (var key in state.objects) {
-    objects.push(this.pack_object(state.objects[key]));
-  }
-
-  // go through explosions
-  var explosions = [];
-  for (key in state.explosions) {
-    explosions.push(this.pack_explosion(state.explosions[key]));
-  }
-
-  return (
-    players.join("#") + "+" + objects.join("#") + "+" + explosions.join("#")
-  );
-};
-
-/* Set state
-	---------------------------------------- */
-
-core.prototype.unpack_state = function(str) {
-  // blank state
-  var state = this.blank_state();
-
-  // run through state string
-  var split = str.split("+");
-  for (var i = 0; i < split.length; i++) {
-    if (split[i]) {
-      var split2 = split[i].split("#");
-      for (var j = 0; j < split2.length; j++) {
-        if (i == 0) {
-          this.unpack_player(state, split2[j]);
-        }
-        if (i == 1) {
-          this.unpack_object(state, split2[j]);
-        }
-        if (i == 2) {
-          this.unpack_explosion(state, split2[j]);
-        }
-      }
-    }
-  }
-
-  return state;
-};
-
-/* Players
-	---------------------------------------- */
-
-core.prototype.pack_player = function(obj) {
-  // prep basic values
-  var dead = obj.dead ? "1" : "";
-  var weapon = this.armoury_refs.indexOf(obj.weapon);
-
-  // prep armoury
-  var armoury = [];
-  for (var key in obj.armoury) {
-    armoury.push(obj.armoury[key]);
-  }
-  armoury = armoury.join("$");
-
-  // prep events
-  var events = [];
-  for (var i = 0; i < obj.events.length; i++) {
-    var event = obj.events[i];
-    if (event.type === "walk") {
-      events.push(event.frame + "~0");
-    }
-    if (event.type === "jump") {
-      events.push(event.frame + "~1");
-    }
-    if (event.type === "shoot") {
-      events.push(event.frame + "~2~" + event.obj + "~" + event.weapon);
-    }
-    if (event.type === "crate") {
-      events.push(event.frame + "~3~" + event.obj);
-    }
-    if (event.type === "medpack") {
-      events.push(event.frame + "~4~" + event.obj);
-    }
-    if (event.type === "gem") {
-      events.push(event.frame + "~5~" + event.obj);
-    }
-  }
-  events = events.join("$");
-
-  // return player string
-  var arr = [
-    obj.id,
-    obj.level,
-    obj.score,
-    dead,
-    obj.health,
-    obj.cooldown,
-    obj.hit,
-    obj.locked,
-    armoury,
-    weapon,
-    events
-  ];
-  return arr.join("/");
-};
-
-core.prototype.unpack_player = function(state, str) {
-  var split = str.split("/");
-  var props = {};
-  props.id = parseInt(split[0]);
-  props.level = parseInt(split[1]);
-  props.score = parseInt(split[2]);
-  props.dead = split[3] === "1" ? true : false;
-  props.health = parseInt(split[4]);
-  props.cooldown = parseInt(split[5]);
-  props.hit = parseInt(split[6]);
-  props.locked = split[7];
-
-  // prep armoury
-  props.armoury = {};
-  var split2 = split[8].split("$");
-  for (var i = 0; i < split2.length; i++) {
-    var key = this.armoury_refs[i];
-    props.armoury[key] = parseInt(split2[i]);
-  }
-
-  // weapon
-  var wep = parseInt(split[9]);
-  if (wep !== -1) {
-    props.weapon = this.armoury_refs[wep];
-  }
-
-  // prep events
-  props.events = [];
-  var split2 = split[10].split("$");
-  for (var i = 0; i < split2.length; i++) {
-    var split3 = split2[i].split("~");
-    var obj = { frame: parseInt(split3[0]) };
-    if (split3[1] === "0") {
-      obj.type = "walk";
-    }
-    if (split3[1] === "1") {
-      obj.type = "jump";
-    }
-    if (split3[1] === "2") {
-      obj.type = "shoot";
-      obj.obj = split3[2];
-      obj.weapon = split3[3];
-    }
-    if (split3[1] === "3") {
-      obj.type = "crate";
-      obj.obj = split3[2];
-    }
-    if (split3[1] === "4") {
-      obj.type = "medpack";
-      obj.obj = split3[2];
-    }
-    if (split3[1] === "5") {
-      obj.type = "gem";
-      obj.obj = split3[2];
-    }
-    if (obj) {
-      props.events.push(obj);
-    }
-  }
-
-  // make it
-  this.create_player(props, state);
-};
-
-/* Objects
-	---------------------------------------- */
-
-core.prototype.pack_object = function(obj) {
-  var grounded = obj.grounded ? "1" : "";
-  var arr = [
-    obj.type,
-    obj.player_id,
-    obj.id,
-    obj.frame,
-    grounded,
-    obj.x,
-    obj.y,
-    obj.speed_x,
-    obj.speed_y,
-    obj.data
-  ];
-  return arr.join("/");
-};
-
-core.prototype.unpack_object = function(state, str) {
-  var split = str.split("/");
-  var props = {};
-  props.type = split[0];
-  props.player_id = parseInt(split[1]);
-  props.id = split[2];
-  props.frame = parseInt(split[3]);
-  props.grounded = split[4] === "1" ? true : false;
-  props.x = parseFloat(split[5]);
-  props.y = parseFloat(split[6]);
-  props.speed_x = parseFloat(split[7]);
-  props.speed_y = parseFloat(split[8]);
-  props.data = split[9];
-
-  this.create_object(props, state);
-};
-
-/* Explosions
-	---------------------------------------- */
-
-core.prototype.pack_explosion = function(obj) {
-  var arr = [
-    obj.player_id,
-    obj.frame,
-    obj.x,
-    obj.y,
-    obj.parent,
-    obj.parent_type
-  ];
-  return arr.join("/");
-};
-
-core.prototype.unpack_explosion = function(state, str) {
-  var split = str.split("/");
-  var props = {};
-  props.player_id = parseInt(split[0]);
-  props.frame = parseInt(split[1]);
-  props.x = parseFloat(split[2]);
-  props.y = parseFloat(split[3]);
-  props.parent = split[4];
-  props.parent_type = split[5];
-
-  this.create_explosion(props, state);
-};
-
-function isMergeableObject(val) {
-  var nonNullObject = val && typeof val === "object";
-
-  return (
-    nonNullObject &&
-    Object.prototype.toString.call(val) !== "[object RegExp]" &&
-    Object.prototype.toString.call(val) !== "[object Date]"
-  );
-}
-
-function emptyTarget(val) {
-  return Array.isArray(val) ? [] : {};
-}
-
-function cloneIfNecessary(value, optionsArgument) {
-  var clone = optionsArgument && optionsArgument.clone === true;
-  return clone && isMergeableObject(value)
-    ? deepmerge(emptyTarget(value), value, optionsArgument)
-    : value;
-}
-
-function defaultArrayMerge(target, source, optionsArgument) {
-  var destination = target.slice();
-  source.forEach(function(e, i) {
-    if (typeof destination[i] === "undefined") {
-      destination[i] = cloneIfNecessary(e, optionsArgument);
-    } else if (isMergeableObject(e)) {
-      destination[i] = deepmerge(target[i], e, optionsArgument);
-    } else if (target.indexOf(e) === -1) {
-      destination.push(cloneIfNecessary(e, optionsArgument));
-    }
-  });
-  return destination;
-}
-
-function mergeObject(target, source, optionsArgument) {
-  var destination = {};
-  if (isMergeableObject(target)) {
-    Object.keys(target).forEach(function(key) {
-      destination[key] = cloneIfNecessary(target[key], optionsArgument);
-    });
-  }
-  Object.keys(source).forEach(function(key) {
-    if (!isMergeableObject(source[key]) || !target[key]) {
-      destination[key] = cloneIfNecessary(source[key], optionsArgument);
-    } else {
-      destination[key] = deepmerge(target[key], source[key], optionsArgument);
-    }
-  });
-  return destination;
-}
-
-function deepmerge(target, source, optionsArgument) {
-  var array = Array.isArray(source);
-  var options = optionsArgument || { arrayMerge: defaultArrayMerge };
-  var arrayMerge = options.arrayMerge || defaultArrayMerge;
-
-  if (array) {
-    return Array.isArray(target)
-      ? arrayMerge(target, source, optionsArgument)
-      : cloneIfNecessary(source, optionsArgument);
-  } else {
-    return mergeObject(target, source, optionsArgument);
-  }
-}
-
-deepmerge.all = function deepmergeAll(array, optionsArgument) {
-  if (!Array.isArray(array) || array.length < 2) {
-    throw new Error(
-      "first argument should be an array with at least two elements"
-    );
-  }
-
-  // we are sure there are at least 2 values, so it is safe to have no initial value
-  return array.reduce(function(prev, next) {
-    return deepmerge(prev, next, optionsArgument);
-  });
-};
-
-/* ========================================================================
-    Math Functions
- ========================================================================== */
-
-/* Shorten "Math" functions
-	---------------------------------------- */
-
-function cos(n) {
-  return Math.cos(n);
-}
-function sin(n) {
-  return Math.sin(n);
-}
-function pow(n) {
-  return Math.pow(n);
-}
-function abs(n) {
-  return Math.abs(n);
-}
-function sqr(n) {
-  return Math.pow(n, 2);
-}
-function sqrt(n) {
-  return Math.sqrt(n);
-}
-function round(n) {
-  return Math.round(n);
-}
-function floor(n) {
-  return Math.floor(n);
-}
-function ceil(n) {
-  return Math.ceil(n);
-}
-function atan2(n1, n2) {
-  return Math.atan2(n1, n2);
-}
-function min(n1, n2) {
-  return Math.min(n1, n2);
-}
-function max(n1, n2) {
-  return Math.max(n1, n2);
-}
-function rand(n1, n2) {
-  return floor(Math.random() * n2) + n1;
-}
-var pi = Math.PI;
-
-/* Fix number to decimal places
-	---------------------------------------- */
-
-Number.prototype.fixed = function(n) {
-  n = n || 2;
-  return parseFloat(this.toFixed(n));
-};
-
-/* Add preceding zeroes to number
-	---------------------------------------- */
-
-function preceding_zeroes(n, length) {
-  var length = length || 2;
-  var n = n.toString();
-  while (n.length < length) {
-    n = "0" + n;
-  }
-  return n;
-}
-
-/* Is number
-	---------------------------------------- */
-
-function is_numeric(n) {
-  return !isNaN(parseFloat(n)) && isFinite(n);
-}
-
-/* Get distance between two points
-	---------------------------------------- */
-
-function get_speed(sx, sy) {
-  return round(sqrt(sqr(sx) + sqr(sy)));
-}
-
-function get_distance(x1, y1, x2, y2) {
-  var dx = x2 - x1,
-    dy = y2 - y1;
-  return get_speed(dx, dy);
-}
-
-/* Check speed limit
-	---------------------------------------- */
-
-function check_speed(sx, sy, speed) {
-  var d = get_distance(0, 0, sx, sy),
-    ns = {
-      x: sx,
-      y: sy,
-      total: d
-    };
-  if (speed < d) {
-    var multi = speed / d;
-    ns.x = sx * multi;
-    ns.y = sy * multi;
-    ns.total = speed;
-  }
-  return ns;
-}
-
-/* Get Heading Angle From X and Y Speed
-	// 0 = left, 360 = left
-	---------------------------------------- */
-
-function get_angle(sx, sy) {
-  return (((atan2(sy, sx) * 180) / pi) % 360) + 180;
-}
-
-function get_heading(x1, y1, x2, y2) {
-  var xs = x2 - x1,
-    ys = y2 - y1;
-  return get_angle(xs, ys);
-}
-
-/* Get X and Y speed from heading and velocity
-	---------------------------------------- */
-
-function xy_speed(angle, speed) {
-  var a = angle_add(angle, 180),
-    r = (a / 180) * pi;
-  return {
-    x: speed * cos(r),
-    y: speed * sin(r)
-  };
-}
-
-/* Get X and Y offset from heading and velocity
-	---------------------------------------- */
-
-function xy_offset(angle, sx, sy) {
-  var xy1 = xy_speed(angle, sx);
-  var xy2 = xy_speed(angle_add(angle, 90), sy);
-  return {
-    x: xy1.x + xy2.x,
-    y: xy1.y + xy2.y
-  };
-}
-
-/* Get difference between two numbers in a loop
-	---------------------------------------- */
-
-function n_diff(current, target, bottom, top) {
-  if (current == target) {
-    return 0;
-  }
-
-  var scale = abs(top - bottom), // get total size of the loop
-    c_current = current - bottom, // correct current for negative numbers
-    c_target = target - bottom, // correct target for negative numbers
-    n1 = (c_target + scale - c_current) % scale, // get difference when adding
-    n2 = (c_current + scale - c_target) % scale; // get difference when subtracting
-
-  // return smallest distance
-  if (n1 < n2) {
-    return n1;
-  } else {
-    return -n2;
-  }
-}
-
-/* Auto loop a number
-	---------------------------------------- */
-
-function n_loop(n, bottom, top) {
-  var difference = abs(top - bottom);
-  while (n <= bottom) {
-    n += difference;
-  }
-  while (n > top) {
-    n -= difference;
-  }
-  return n;
-}
-
-/* Add to a number without overflowing up or down from min/max
-	---------------------------------------- */
-
-function n_add(n1, n2, t1, t2) {
-  var dif = abs(t2 - t1),
-    na = n1 + n2;
-  while (na < t1) {
-    na += dif;
-  }
-  while (na >= t2) {
-    na -= dif;
-  }
-  return na;
-}
-
-/* Add to an angle without overflowing up or down from 0-360
-	---------------------------------------- */
-
-function angle_add(angle, add) {
-  if (!angle) {
-    angle = 0;
-  }
-  return n_add(angle, add, 0, 360);
-}
-
-/* Move number towards a new number with loop
-	---------------------------------------- */
-
-function increment_num(current, target, bottom, top, speed) {
-  var diff = n_diff(current, target, bottom, top); // get shortest route to number
-  move = min(abs(diff) / 10, 4) * speed; // calculate how much to move
-
-  // if difference is less then movement, return target
-  if (abs(diff) < move) {
-    return target;
-  }
-
-  // add or subtract movement
-  move = diff < 0 ? -move : move;
-  return n_add(current, move, bottom, top);
-}
-
-/* Move angle towards a new angle
-	---------------------------------------- */
-
-function increment_angle(old_angle, new_angle, speed) {
-  return increment_num(old_angle, new_angle, 0, 360, speed);
-}
-
-/* If a point is within a circle
-	---------------------------------------- */
-
-function in_circle(x, y, cx, cy, radius) {
-  return get_distance(x, y, cx, cy) < radius;
-}
-
-/* Plot a course
-	---------------------------------------- */
-
-function plot_course(x, y, sx, sy, extend) {
-  // get initial speed
-  var extend = extend ? extend : 0,
-    speed = get_speed(sx, sy);
-
-  // if no distance then do nothing
-  if (speed == 0) {
-    return { move: false };
-  }
-
-  // calculate increments
-  var increment_x = sx / speed,
-    increment_y = sy / speed,
-    new_x = x - increment_x * extend,
-    new_y = y - increment_y * extend,
-    points = [{ x: new_x, y: new_y }];
-
-  // iterate through path and record points
-  for (var i = 0; i < speed + extend * 2; i++) {
-    (new_x += increment_x), (new_y += increment_y);
-    points.push({
-      x: new_x,
-      y: new_y
-    });
-  }
-
-  // return point array
-  return {
-    move: true,
-    points: points
-  };
-}
-
-/* translate co-ordinates by an angle
-	---------------------------------------- */
-
-function rotate_coords(x, y, cx, cy, angle) {
-  var r = (pi / 180) * angle;
-  return {
-    x: cos(r) * (x - cx) + sin(r) * (y - cy) + cx,
-    y: cos(r) * (y - cy) - sin(r) * (x - cx) + cy
-  };
-}
-
-/* ========================================================================
-    Misc Functions
- ========================================================================== */
-
-/* Duplicate object
-	---------------------------------------- */
-
-function duplicate_obj(obj) {
-  return JSON.parse(JSON.stringify(obj));
-}
-
-/* Prevent array merging
-	---------------------------------------- */
-
-function dont_merge(destination, source) {
-  if (!source) {
-    return destination;
-  } else {
-    return source;
-  }
-}
-
-/* Add space to a string
-	---------------------------------------- */
-
-function str_space(str) {
-  var new_str = "";
-  for (var i = 0; i < str.length; i++) {
-    var add = i == str.length - 1 ? "" : "\u200A";
-    new_str += str[i] + add;
-  }
-  return new_str;
-}
-
-/* Log multiple values
-	---------------------------------------- */
-
-function clog(
-  s1,
-  s2,
-  s3,
-  s4,
-  s5,
-  s6,
-  s7,
-  s8,
-  s9,
-  s10,
-  s11,
-  s12,
-  s13,
-  s14,
-  s15
-) {
-  var str = s1;
-  if (s2 != undefined) {
-    str += " | " + s2;
-  }
-  if (s3 != undefined) {
-    str += " | " + s3;
-  }
-  if (s4 != undefined) {
-    str += " | " + s4;
-  }
-  if (s5 != undefined) {
-    str += " | " + s5;
-  }
-  if (s6 != undefined) {
-    str += " | " + s6;
-  }
-  if (s7 != undefined) {
-    str += " | " + s7;
-  }
-  if (s8 != undefined) {
-    str += " | " + s8;
-  }
-  if (s9 != undefined) {
-    str += " | " + s9;
-  }
-  if (s10 != undefined) {
-    str += " | " + s10;
-  }
-  if (s11 != undefined) {
-    str += " | " + s11;
-  }
-  if (s12 != undefined) {
-    str += " | " + s12;
-  }
-  if (s13 != undefined) {
-    str += " | " + s13;
-  }
-  if (s14 != undefined) {
-    str += " | " + s14;
-  }
-  if (s15 != undefined) {
-    str += " | " + s15;
-  }
-  console.log(str);
-}
-
 var schemes = schemes || {};
 schemes.deathmatch = {
   title: "Deathmatch",
@@ -5261,6 +4647,620 @@ schemes.default = {
     destroy_obj_type: {},
     destroy_obj_player: {}
   }
+};
+
+/* ========================================================================
+	Map Generator
+	Blobs
+ ========================================================================== */
+
+/* Draw a blob
+	---------------------------------------- */
+
+function mapgen_blob(img, config, decorations, radius, type) {
+  this.size = 36;
+  this.img = img;
+  this.c = config;
+
+  // get land type
+  var type = type || Math.floor(Math.random() * this.c.land_type.length);
+  this.ref = this.c.land_type[type];
+
+  // set up main anchor points
+  var anchors = [];
+  var points = Math.floor(radius / 2) + 4;
+  var spike = Math.floor(radius / 2) + 2;
+  for (var p = 0; p < points; p++) {
+    var new_radius =
+      Math.max(radius - Math.floor(Math.random() * spike), 1) + 1;
+    var x =
+      radius + Math.floor(new_radius * Math.cos((2 * Math.PI * p) / points));
+    var y =
+      radius + Math.floor(new_radius * Math.sin((2 * Math.PI * p) / points));
+    anchors.push({ x: x, y: y });
+  }
+
+  // draw shape to canvas
+  var size = radius * 2 + 1;
+  var shape = mapgen_canvas(size, size);
+  this.draw_path(shape, anchors);
+
+  // build array of land or not tiles
+  var pixels = shape.cont.getImageData(0, 0, shape.w, shape.h);
+  this.land = [];
+  for (var y = 0; y < size; y++) {
+    this.land[y] = [];
+    for (var x = 0; x < size; x++) {
+      var i = (y * size + x) * 4 + 3;
+      this.land[y][x] = pixels.data[i] > 30 ? 1 : 0;
+    }
+  }
+
+  // build tile array and assign corners and land
+  this.tiles = [];
+  for (var y = 0; y < size; y++) {
+    this.tiles[y] = [];
+    for (var x = 0; x < size; x++) {
+      this.tiles[y][x] = this.set_corner_tile(y, x);
+    }
+  }
+
+  // assign pixels a tile value
+  for (var y = 0; y < size; y++) {
+    for (var x = 0; x < size; x++) {
+      this.tiles[y][x] =
+        this.tiles[y][x] === 12 ? this.set_land_tile(y, x) : this.tiles[y][x];
+    }
+  }
+
+  // draw them
+  var wh = (size + 4) * this.size;
+  this.alpha = mapgen_canvas(wh, wh);
+  this.edge = mapgen_canvas(wh, wh);
+  this.bg = mapgen_canvas(wh, wh);
+  for (var y = 0; y < size; y++) {
+    for (var x = 0; x < size; x++) {
+      var tile = this.tiles[y][x];
+      if (tile === -1) {
+        continue;
+      }
+
+      // draw it
+      var x1 = (x + 2) * this.size;
+      var y1 = (y + 2) * this.size;
+      this.draw_to_canvas(this.alpha.cont, x1, y1, tile, 0);
+      this.draw_to_canvas(this.edge.cont, x1, y1, tile, this.ref.edge);
+
+      if (decorations) {
+        this.draw_decoration(this.bg.cont, x, y, tile);
+      }
+    }
+  }
+
+  // draw rest of fg
+  var fg = mapgen_pattern(this.alpha.canv, this.img[this.ref.fg]);
+  fg.cont.drawImage(this.edge.canv, 0, 0);
+
+  // draw dirt bg
+  var fg_dirt = mapgen_pattern(fg.canv, this.img[this.ref.bg]);
+  this.bg.cont.drawImage(fg_dirt.canv, 0, 0);
+
+  // export
+  return {
+    fg: fg,
+    bg: this.bg
+  };
+}
+
+/* Draw an alpha path
+	---------------------------------------- */
+
+mapgen_blob.prototype.draw_path = function(canv, path) {
+  // start paths on canvases
+  canv.cont.beginPath();
+  canv.cont.moveTo(path[0].x, path[0].y);
+
+  // go through path
+  for (var i = 1; i < path.length - 1; i++) {
+    // get next point to curve around
+    var point1 = path[i],
+      point2 = path[i + 1],
+      qx,
+      qy;
+
+    // get curve values
+    if (i < path.length - 1) {
+      qx = (point1.x + point2.x) / 2;
+      qy = (point1.y + point2.y) / 2;
+    } else {
+      qx = point2.x;
+      qy = point2.y;
+    }
+
+    // draw curve to path
+    canv.cont.quadraticCurveTo(point1.x, point1.y, qx, qy);
+  }
+
+  // rejoin the beginning of the path and fill
+  canv.cont.lineTo(path[0].x, path[0].y);
+  canv.cont.fill();
+};
+
+/* Draw a decoration
+	---------------------------------------- */
+
+mapgen_blob.prototype.draw_decoration = function(cont, x, y, tile) {
+  // are we drawing one
+  if (tile > 7 || Math.floor(Math.random() * 2) !== 0) {
+    return;
+  }
+
+  // can we do doubles
+  var double = false;
+  if (tile === 0 && this.is_type(y, x + 1, 0)) {
+    double = true;
+  }
+  if (tile === 1 && this.is_type(y, x - 1, 1)) {
+    double = true;
+  }
+  if (tile === 2 && this.is_type(y - 1, x, 2)) {
+    double = true;
+  }
+  if (tile === 3 && this.is_type(y + 1, x, 3)) {
+    double = true;
+  }
+  if (tile === 4 && this.is_type(y - 1, x + 1, 4)) {
+    double = true;
+  }
+  if (tile === 5 && this.is_type(y + 1, x + 1, 5)) {
+    double = true;
+  }
+  if (tile === 6 && this.is_type(y - 1, x - 1, 6)) {
+    double = true;
+  }
+  if (tile === 7 && this.is_type(y + 1, x - 1, 7)) {
+    double = true;
+  }
+
+  // choose source
+  var source = this.ref.decorations[1];
+  if (double && Math.floor(Math.random() * 2) === 0) {
+    source = this.ref.decorations[2];
+  } else {
+    double = false;
+  }
+
+  // choose decoration
+  var i = Math.floor(Math.random() * source.length);
+  var ref = source[i];
+
+  // get position to draw it
+  var half = this.size / 2;
+  var x1 = (x + 2) * this.size;
+  var y1 = (y + 2) * this.size;
+  var angle = 0;
+  if (tile === 1) {
+    x1 += this.size;
+    y1 += this.size;
+    angle = 180;
+  }
+  if (tile === 2) {
+    y1 += this.size;
+    angle = 270;
+  }
+  if (tile === 3) {
+    x1 += this.size;
+    angle = 90;
+  }
+  if (tile === 4) {
+    y1 += this.size;
+    angle = 315;
+  }
+  if (tile === 5) {
+    angle = 45;
+  }
+  if (tile === 6) {
+    x1 += this.size;
+    y1 += this.size;
+    angle = 225;
+  }
+  if (tile === 7) {
+    x1 += this.size;
+    angle = 135;
+  }
+
+  // draw that shit
+  var x_add = double ? this.size : 0;
+  cont.save();
+  cont.translate(x1, y1);
+  cont.rotate((angle * Math.PI) / 180);
+  cont.drawImage(
+    this.img.decorations,
+    ref.x,
+    ref.y,
+    ref.w,
+    ref.h,
+    0,
+    -ref.h + 5,
+    ref.w,
+    ref.h
+  );
+  cont.translate(-x1, -y1);
+  cont.restore();
+};
+
+/* Draw a tile to a canvas
+	---------------------------------------- */
+
+mapgen_blob.prototype.draw_to_canvas = function(cont, x, y, tile, key) {
+  var ts = this.size;
+  cont.save();
+  cont.translate(x, y);
+  cont.drawImage(this.img.edge, tile * ts, key * ts, ts, ts, 0, 0, ts, ts);
+  cont.translate(-y, -y);
+  cont.restore();
+};
+
+/* Get corner and land tiles
+	---------------------------------------- */
+
+mapgen_blob.prototype.set_corner_tile = function(y, x) {
+  var tile = -1;
+
+  //land
+  if (this.is_land(y, x)) {
+    tile = 12;
+
+    // not land
+  } else {
+    // corners
+    if (
+      !this.is_land(y - 1, x) &&
+      !this.is_land(y, x - 1) &&
+      this.is_land(y + 1, x) &&
+      this.is_land(y, x + 1)
+    ) {
+      tile = 4;
+    } else if (
+      !this.is_land(y - 1, x) &&
+      this.is_land(y, x - 1) &&
+      this.is_land(y + 1, x) &&
+      !this.is_land(y, x + 1)
+    ) {
+      tile = 5;
+    } else if (
+      this.is_land(y - 1, x) &&
+      !this.is_land(y, x - 1) &&
+      !this.is_land(y + 1, x) &&
+      this.is_land(y, x + 1)
+    ) {
+      tile = 6;
+    } else if (
+      this.is_land(y - 1, x) &&
+      this.is_land(y, x - 1) &&
+      !this.is_land(y + 1, x) &&
+      !this.is_land(y, x + 1)
+    ) {
+      tile = 7;
+    }
+  }
+
+  return tile;
+};
+
+/* Set land tile types
+	---------------------------------------- */
+
+mapgen_blob.prototype.set_land_tile = function(y, x) {
+  var tile = 12;
+
+  // corners
+  if (
+    !this.is_land(y - 1, x) &&
+    !this.is_land(y, x - 1) &&
+    this.is_land_or_corner(y + 1, x) &&
+    this.is_land_or_corner(y, x + 1) &&
+    !this.is_corner(y, x - 1) &&
+    !this.is_corner(y - 1, x)
+  ) {
+    tile = 4;
+  } else if (
+    !this.is_land(y - 1, x) &&
+    !this.is_land(y, x + 1) &&
+    this.is_land_or_corner(y, x - 1) &&
+    this.is_land_or_corner(y + 1, x) &&
+    !this.is_corner(y, x + 1) &&
+    !this.is_corner(y - 1, x)
+  ) {
+    tile = 5;
+  } else if (
+    !this.is_land(y, x - 1) &&
+    !this.is_land(y + 1, x) &&
+    this.is_land_or_corner(y - 1, x) &&
+    this.is_land_or_corner(y, x + 1) &&
+    !this.is_corner(y, x - 1) &&
+    !this.is_corner(y + 1, x)
+  ) {
+    tile = 6;
+  } else if (
+    !this.is_land(y + 1, x) &&
+    !this.is_land(y, x + 1) &&
+    this.is_land_or_corner(y - 1, x) &&
+    this.is_land_or_corner(y, x - 1) &&
+    !this.is_corner(y, x + 1) &&
+    !this.is_corner(y + 1, x)
+  ) {
+    tile = 7;
+
+    // flat edges
+  } else if (
+    !this.is_land(y - 1, x) &&
+    this.is_land(y + 1, x) &&
+    !this.is_corner(y - 1, x)
+  ) {
+    tile = 0;
+  } else if (
+    !this.is_land(y + 1, x) &&
+    this.is_land(y - 1, x) &&
+    !this.is_corner(y + 1, x)
+  ) {
+    tile = 1;
+  } else if (
+    !this.is_land(y, x - 1) &&
+    this.is_land(y, x + 1) &&
+    !this.is_corner(y, x - 1)
+  ) {
+    tile = 2;
+  } else if (
+    !this.is_land(y, x + 1) &&
+    this.is_land(y, x - 1) &&
+    !this.is_corner(y, x + 1)
+  ) {
+    tile = 3;
+
+    // inside corners
+  } else if (this.is_type(y + 1, x, 7) || this.is_type(y, x + 1, 7)) {
+    tile = 8;
+  } else if (this.is_type(y + 1, x, 6) || this.is_type(y, x - 1, 6)) {
+    tile = 9;
+  } else if (this.is_type(y - 1, x, 5) || this.is_type(y, x + 1, 5)) {
+    tile = 10;
+  } else if (this.is_type(y - 1, x, 4) || this.is_type(y, x - 1, 4)) {
+    tile = 11;
+  }
+
+  return tile;
+};
+
+/* Check arrays for values
+	---------------------------------------- */
+
+mapgen_blob.prototype.is_land_or_corner = function(y, x) {
+  if (this.is_corner(y, x) || this.is_land(y, x)) {
+    return true;
+  }
+};
+
+mapgen_blob.prototype.is_corner = function(y, x) {
+  return this.check_arr(this.tiles, y, x, [4, 5, 6, 7]);
+};
+
+mapgen_blob.prototype.is_type = function(y, x, type) {
+  return this.check_arr(this.tiles, y, x, [type]);
+};
+
+mapgen_blob.prototype.is_land = function(y, x) {
+  return this.check_arr(this.land, y, x, [1]);
+};
+
+mapgen_blob.prototype.check_arr = function(arr, y, x, checks) {
+  if (y < 0 || y >= arr.length || x < 0 || x >= arr[0].length) {
+    return false;
+  }
+  for (var i = 0; i < checks.length; i++) {
+    if (arr[y][x] == checks[i]) {
+      return true;
+    }
+  }
+};
+
+/* ========================================================================
+	Map Generator
+	Make Canvas
+ ========================================================================== */
+
+/* Set up a new canvas
+	---------------------------------------- */
+
+function mapgen_canvas(w, h) {
+  var obj = {};
+  if ("undefined" != typeof global) {
+    obj.canv = new canvas();
+  } else {
+    obj.canv = document.createElement("canvas");
+  }
+  obj.cont = obj.canv.getContext("2d");
+  obj.canv.width = w;
+  obj.canv.height = h;
+  obj.cont.fillStyle = "#fff";
+  obj.w = w;
+  obj.h = h;
+  return obj;
+}
+
+/* Draw a pattern to a canvas
+	---------------------------------------- */
+
+function mapgen_pattern(alpha, pattern) {
+  var canv = mapgen_canvas(alpha.width, alpha.height);
+  if (typeof pattern !== "string") {
+    pattern = canv.cont.createPattern(pattern, "repeat");
+  }
+  canv.cont.fillStyle = pattern;
+  canv.cont.fillRect(0, 0, alpha.width, alpha.height);
+  canv.cont.globalCompositeOperation = "destination-in";
+  canv.cont.drawImage(alpha, 0, 0);
+  canv.cont.globalCompositeOperation = "normal";
+
+  return canv;
+}
+
+/* ========================================================================
+	Map Generator
+	------------
+	Config:
+	w           // width of map
+	h           // height of map
+	crust       // thickness of outer crust on land
+	blobs       // initial blobs
+	center_blob // size of center blob of land, 0 for none
+	small_blobs // number of random small circles of land
+	large_blobs // number of random large circles of land
+	-----------
+ ========================================================================== */
+
+/* Server side only
+	---------------------------------------- */
+
+if ("undefined" != typeof global) {
+  var fs = require("fs");
+}
+
+/* New Map Generation
+	---------------------------------------- */
+
+function mapgen(img, config, scheme, map_img) {
+  this.size = 36;
+  this.img = img;
+  this.c = config;
+  this.scheme = scheme;
+
+  // choose type
+  if (this.scheme.type == "random") {
+    return this.draw_random();
+  }
+  if (this.scheme.type == "image") {
+    return this.draw_image(map_img);
+  }
+}
+
+/* Draw image
+	---------------------------------------- */
+
+mapgen.prototype.draw_image = function(map_img) {
+  var fg = mapgen_canvas(
+    map_img.width + this.scheme.gap * 2,
+    map_img.height + this.scheme.gap * 2
+  );
+  fg.cont.drawImage(map_img, this.scheme.gap, this.scheme.gap);
+  var bg = mapgen_pattern(fg.canv, this.img.dirt);
+  return { fg: fg, bg: bg };
+};
+
+/* Draw random
+	---------------------------------------- */
+
+mapgen.prototype.draw_random = function() {
+  // setup
+  this.blobs = JSON.parse(JSON.stringify(this.scheme.blobs));
+  this.bg = mapgen_canvas(this.scheme.w, this.scheme.h);
+  this.fg = mapgen_canvas(this.scheme.w, this.scheme.h);
+
+  // generate some random large circles
+  for (var i = 0; i < this.scheme.large_blobs; i++) {
+    this.blobs = this.get_circle(this.blobs, 4, 6);
+  }
+
+  // generate some random small circles
+  for (var i = 0; i < this.scheme.small_blobs; i++) {
+    this.blobs = this.get_circle(this.blobs, 1, 3);
+  }
+
+  // go through each blob
+  for (var i = 0; i < this.blobs.length; i++) {
+    var blob = this.blobs[i];
+
+    // create the blobs
+    var bg = new mapgen_blob(this.img, this.c, false, blob.r + 4, blob.type);
+    var fg = new mapgen_blob(
+      this.img,
+      this.c,
+      this.scheme.decorations,
+      blob.r,
+      blob.type
+    );
+
+    // combine the backgrounds
+    var wh = fg.fg.canv.width;
+    var new_bg = mapgen_canvas(wh, wh);
+    new_bg.cont.drawImage(bg.fg.canv, wh * 0.1, wh * 0.1, wh * 0.8, wh * 0.8);
+    new_bg.cont.globalCompositeOperation = "source-atop";
+    new_bg.cont.fillStyle = "rgba(0,0,0,0.8)";
+    new_bg.cont.fillRect(0, 0, wh, wh);
+    new_bg.cont.globalCompositeOperation = "normal";
+    new_bg.cont.drawImage(fg.bg.canv, 0, 0);
+
+    // draw it to main canvas
+    this.bg.cont.drawImage(new_bg.canv, blob.x - wh / 2, blob.y - wh / 2);
+    this.fg.cont.drawImage(fg.fg.canv, blob.x - wh / 2, blob.y - wh / 2);
+  }
+
+  // return it
+  return {
+    bg: this.bg,
+    fg: this.fg
+  };
+};
+
+/* Get a far away circle
+	---------------------------------------- */
+
+mapgen.prototype.get_circle = function(arr, min_radius, max_radius) {
+  // generate many circles and find furthest away
+  var distance = 0;
+  var circle = null;
+
+  for (var i = 0; i < 20; i++) {
+    // make new circle
+    var test_circle = this.circle(min_radius, max_radius);
+    var smallest_distance = 999999;
+
+    // find shortest distance from all other circles
+    for (var j = 0; j < arr.length; j++) {
+      var dx = arr[j].x - test_circle.x;
+      var dy = arr[j].y - test_circle.y;
+      var test_distance = Math.round(
+        Math.sqrt(Math.pow(dx, 2) + Math.pow(dy, 2))
+      );
+      smallest_distance =
+        test_distance < smallest_distance ? test_distance : smallest_distance;
+    }
+
+    // if is the largest distance record this as furthest
+    if (distance < smallest_distance) {
+      distance = smallest_distance;
+      circle = test_circle;
+    }
+  }
+
+  // add furthest away circle to new array
+  arr.push(circle);
+  return arr;
+};
+
+/* Generate a random circle
+	---------------------------------------- */
+
+mapgen.prototype.circle = function(min_radius, max_radius) {
+  var r = Math.floor(Math.random() * max_radius) + min_radius;
+  var gap = (r + 2) * this.size + this.scheme.gap;
+  var x = Math.floor(Math.random() * (this.scheme.w - gap * 2)) + gap;
+  var y = Math.floor(Math.random() * (this.scheme.h - gap * 2)) + gap;
+  return {
+    r: r,
+    x: x,
+    y: y
+  };
 };
 
 /* ========================================================================

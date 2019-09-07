@@ -34,6 +34,13 @@
 		z-index: 100;
 		bottom: 10px;
 		left: 32px;
+		transform-origin: 0 100%;
+		@media (max-width: 800px) {
+			transform: scale(0.8);
+		}
+		@media (max-width: 500px) {
+			transform: scale(0.5);
+		}
 
 		.hex-button {
 			position: relative;
@@ -220,6 +227,14 @@
 		background: rgba(0,0,0,0.8);
 		padding: 5px;
 		border-radius: 10px 0 0 10px;
+
+		transform-origin: 100% 100%;
+		@media (max-width: 800px) {
+			transform: scale(0.8);
+		}
+		@media (max-width: 500px) {
+			transform: scale(0.5);
+		}
 
 		.gem {
 			float: left;

@@ -51,7 +51,7 @@ app.prototype.init_settings = function() {
   hide(this.div_settings);
 
   // volume
-  this.div_volume = element({ text: "<h2>Volume</h2>" });
+  this.div_volume = element({ text: "<h3>Volume</h3>" });
   this.input_volume = element({ type: "input" });
   this.input_volume.type = "range";
   this.input_volume.setAttribute("min", 0);
@@ -66,7 +66,7 @@ app.prototype.init_settings = function() {
   };
 
   // controls
-  var ctext = "<h2>Controls (Mouse + Keyboard)</h2>";
+  var ctext = "<h3>Controls (Mouse + Keyboard)</h3>";
   ctext += "<dl>";
   ctext += "<dt>Move</dt><dd>Left Click</dd>";
   ctext += "<dt>Jump</dt><dd>Spacebar</dd>";
@@ -75,7 +75,7 @@ app.prototype.init_settings = function() {
   ctext += "<dt>Follow Weapons</dt><dd>F</dd>";
   ctext += "<dt>Free Cam</dt><dd>Middle Click</dd>";
   ctext += "</dl>";
-  ctext += "<h2>Controls (Touchscreen)</h2>";
+  ctext += "<h3>Controls (Touchscreen)</h3>";
   ctext += "<dl>";
   ctext += "<dt>Move</dt><dd>Tap</dd>";
   ctext += "<dt>Shoot</dt><dd>Double Tap</dd>";
