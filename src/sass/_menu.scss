@@ -1,111 +1,122 @@
-
 /* ========================================================================
 	 Main Menu
  ========================================================================== */
 
-	.app {
-		background: url(../images/textures/space.jpg);
-		position: absolute;
-		width: 100%;
-		height: 100%;
-		top: 50%;
-		left: 50%;
-		transform: translate(-50%, -50%);
-	}
+.app {
+  background: url(../images/textures/space.jpg);
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
 
-	.logo {
-		display: block;
-		margin: 0 auto;
-		max-height: 50%;
-		max-width: 620px;
-		margin-bottom: 20px;
-	}
+.logo {
+  display: block;
+  margin: 0 auto;
+  max-height: 50%;
+  max-width: 620px;
+  margin-bottom: 20px;
+}
 
-	.start {
-		text-align: center;
-	}
+.start {
+  text-align: center;
+}
 
-	.main_menu {
-		position: absolute;
-		width: 100%;
-		height: 100%;
-		margin: 0 auto 0;
-		text-align: center;
+.main_menu {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  margin: 0 auto 0;
+  text-align: center;
 
-		p {
-			margin-bottom: 5px;
-			text-shadow: 0 1px #000;
-			span {
-				color: rgba(255,255,255,0.5);
-			}
-		}
+  p {
+    margin-bottom: 5px;
+    text-shadow: 0 1px #000;
+    span {
+      color: rgba(255, 255, 255, 0.5);
+    }
+  }
 
-		input {
-			margin-bottom: 10px;
-		}
-		
-		.buttons .button {
-			width: 140px;
-		}
-	}
+  input {
+    margin-bottom: 10px;
+  }
 
-	.links {
-		font-size: 10px;
-		text-align: center;
-		line-height: 1.5;
-		padding-top: 30px;
-		a {
-			color: #ccc;
-		}
-		span {
-			display: inline-block;
-			vertical-align: middle;
-		}
-		.ball {
-			display: inline-block;
-			width: 40px;
-			height: 40px;
-			font-size: 12px;
-			margin: 0 2px 20px;
-		}
-	}
+  .buttons .button {
+    width: 140px;
+  }
+}
 
-	.settings {
-		position: absolute;
-		z-index: 100;
-		top: 0;
-		left: 0;
-		width: 96px;
-		height: 48px;
-		cursor: pointer;
-		user-select: none;
-		img {
-			float: left;
-		}
-	}
+.links {
+  font-size: 10px;
+  text-align: center;
+  line-height: 1.5;
+  padding-top: 30px;
+  a {
+    color: #ccc;
+  }
+  span {
+    display: inline-block;
+    vertical-align: middle;
+  }
+  .ball {
+    display: inline-block;
+    width: 40px;
+    height: 40px;
+    font-size: 12px;
+    margin: 0 2px 20px;
+  }
+}
 
-	.ping {
-		position: absolute;
-		top: 15px;
-		left: 60px;
-		font-size: 11px;
-		font-weight: bold;
-		color: #ff3333;
-		z-index: 100;
-		text-shadow: 0 2px #000;
-	}
+.settings_1 {
+  position: absolute;
+  z-index: 100;
+  width: 50px;
+  height: 60px;
+  line-height: 60px;
+  text-align: center;
+  top: 0;
+  left: 0;
+  cursor: pointer;
+  user-select: none;
+  font-size: 1.2em;
+}
 
-	.fps {
-		position: absolute;
-		top: 15px;
-		left: 100px;
-		font-size: 11px;
-		font-weight: bold;
-		color: #33ff33;
-		z-index: 100;
-		text-shadow: 0 2px #000;
-	}
+.settings_2 {
+  position: absolute;
+  z-index: 100;
+  width: 48px;
+  height: 48px;
+  text-align: center;
+  top: 6px;
+  left: 50px;
+  cursor: pointer;
+  user-select: none;
+}
 
-	input.highlighted {
-		border-color: #cc0000;
-	}
+.ping {
+  position: absolute;
+  top: 15px;
+  left: 60px;
+  font-size: 11px;
+  font-weight: bold;
+  color: #ff3333;
+  z-index: 100;
+  text-shadow: 0 2px #000;
+}
+
+.fps {
+  position: absolute;
+  top: 15px;
+  left: 100px;
+  font-size: 11px;
+  font-weight: bold;
+  color: #33ff33;
+  z-index: 100;
+  text-shadow: 0 2px #000;
+}
+
+input.highlighted {
+  border-color: #cc0000;
+}

@@ -1,466 +1,3 @@
-function isMergeableObject(val) {
-  var nonNullObject = val && typeof val === "object";
-
-  return (
-    nonNullObject &&
-    Object.prototype.toString.call(val) !== "[object RegExp]" &&
-    Object.prototype.toString.call(val) !== "[object Date]"
-  );
-}
-
-function emptyTarget(val) {
-  return Array.isArray(val) ? [] : {};
-}
-
-function cloneIfNecessary(value, optionsArgument) {
-  var clone = optionsArgument && optionsArgument.clone === true;
-  return clone && isMergeableObject(value)
-    ? deepmerge(emptyTarget(value), value, optionsArgument)
-    : value;
-}
-
-function defaultArrayMerge(target, source, optionsArgument) {
-  var destination = target.slice();
-  source.forEach(function(e, i) {
-    if (typeof destination[i] === "undefined") {
-      destination[i] = cloneIfNecessary(e, optionsArgument);
-    } else if (isMergeableObject(e)) {
-      destination[i] = deepmerge(target[i], e, optionsArgument);
-    } else if (target.indexOf(e) === -1) {
-      destination.push(cloneIfNecessary(e, optionsArgument));
-    }
-  });
-  return destination;
-}
-
-function mergeObject(target, source, optionsArgument) {
-  var destination = {};
-  if (isMergeableObject(target)) {
-    Object.keys(target).forEach(function(key) {
-      destination[key] = cloneIfNecessary(target[key], optionsArgument);
-    });
-  }
-  Object.keys(source).forEach(function(key) {
-    if (!isMergeableObject(source[key]) || !target[key]) {
-      destination[key] = cloneIfNecessary(source[key], optionsArgument);
-    } else {
-      destination[key] = deepmerge(target[key], source[key], optionsArgument);
-    }
-  });
-  return destination;
-}
-
-function deepmerge(target, source, optionsArgument) {
-  var array = Array.isArray(source);
-  var options = optionsArgument || { arrayMerge: defaultArrayMerge };
-  var arrayMerge = options.arrayMerge || defaultArrayMerge;
-
-  if (array) {
-    return Array.isArray(target)
-      ? arrayMerge(target, source, optionsArgument)
-      : cloneIfNecessary(source, optionsArgument);
-  } else {
-    return mergeObject(target, source, optionsArgument);
-  }
-}
-
-deepmerge.all = function deepmergeAll(array, optionsArgument) {
-  if (!Array.isArray(array) || array.length < 2) {
-    throw new Error(
-      "first argument should be an array with at least two elements"
-    );
-  }
-
-  // we are sure there are at least 2 values, so it is safe to have no initial value
-  return array.reduce(function(prev, next) {
-    return deepmerge(prev, next, optionsArgument);
-  });
-};
-
-/* ========================================================================
-    Math Functions
- ========================================================================== */
-
-/* Shorten "Math" functions
-	---------------------------------------- */
-
-function cos(n) {
-  return Math.cos(n);
-}
-function sin(n) {
-  return Math.sin(n);
-}
-function pow(n) {
-  return Math.pow(n);
-}
-function abs(n) {
-  return Math.abs(n);
-}
-function sqr(n) {
-  return Math.pow(n, 2);
-}
-function sqrt(n) {
-  return Math.sqrt(n);
-}
-function round(n) {
-  return Math.round(n);
-}
-function floor(n) {
-  return Math.floor(n);
-}
-function ceil(n) {
-  return Math.ceil(n);
-}
-function atan2(n1, n2) {
-  return Math.atan2(n1, n2);
-}
-function min(n1, n2) {
-  return Math.min(n1, n2);
-}
-function max(n1, n2) {
-  return Math.max(n1, n2);
-}
-function rand(n1, n2) {
-  return floor(Math.random() * n2) + n1;
-}
-var pi = Math.PI;
-
-/* Fix number to decimal places
-	---------------------------------------- */
-
-Number.prototype.fixed = function(n) {
-  n = n || 2;
-  return parseFloat(this.toFixed(n));
-};
-
-/* Add preceding zeroes to number
-	---------------------------------------- */
-
-function preceding_zeroes(n, length) {
-  var length = length || 2;
-  var n = n.toString();
-  while (n.length < length) {
-    n = "0" + n;
-  }
-  return n;
-}
-
-/* Is number
-	---------------------------------------- */
-
-function is_numeric(n) {
-  return !isNaN(parseFloat(n)) && isFinite(n);
-}
-
-/* Get distance between two points
-	---------------------------------------- */
-
-function get_speed(sx, sy) {
-  return round(sqrt(sqr(sx) + sqr(sy)));
-}
-
-function get_distance(x1, y1, x2, y2) {
-  var dx = x2 - x1,
-    dy = y2 - y1;
-  return get_speed(dx, dy);
-}
-
-/* Check speed limit
-	---------------------------------------- */
-
-function check_speed(sx, sy, speed) {
-  var d = get_distance(0, 0, sx, sy),
-    ns = {
-      x: sx,
-      y: sy,
-      total: d
-    };
-  if (speed < d) {
-    var multi = speed / d;
-    ns.x = sx * multi;
-    ns.y = sy * multi;
-    ns.total = speed;
-  }
-  return ns;
-}
-
-/* Get Heading Angle From X and Y Speed
-	// 0 = left, 360 = left
-	---------------------------------------- */
-
-function get_angle(sx, sy) {
-  return (((atan2(sy, sx) * 180) / pi) % 360) + 180;
-}
-
-function get_heading(x1, y1, x2, y2) {
-  var xs = x2 - x1,
-    ys = y2 - y1;
-  return get_angle(xs, ys);
-}
-
-/* Get X and Y speed from heading and velocity
-	---------------------------------------- */
-
-function xy_speed(angle, speed) {
-  var a = angle_add(angle, 180),
-    r = (a / 180) * pi;
-  return {
-    x: speed * cos(r),
-    y: speed * sin(r)
-  };
-}
-
-/* Get X and Y offset from heading and velocity
-	---------------------------------------- */
-
-function xy_offset(angle, sx, sy) {
-  var xy1 = xy_speed(angle, sx);
-  var xy2 = xy_speed(angle_add(angle, 90), sy);
-  return {
-    x: xy1.x + xy2.x,
-    y: xy1.y + xy2.y
-  };
-}
-
-/* Get difference between two numbers in a loop
-	---------------------------------------- */
-
-function n_diff(current, target, bottom, top) {
-  if (current == target) {
-    return 0;
-  }
-
-  var scale = abs(top - bottom), // get total size of the loop
-    c_current = current - bottom, // correct current for negative numbers
-    c_target = target - bottom, // correct target for negative numbers
-    n1 = (c_target + scale - c_current) % scale, // get difference when adding
-    n2 = (c_current + scale - c_target) % scale; // get difference when subtracting
-
-  // return smallest distance
-  if (n1 < n2) {
-    return n1;
-  } else {
-    return -n2;
-  }
-}
-
-/* Auto loop a number
-	---------------------------------------- */
-
-function n_loop(n, bottom, top) {
-  var difference = abs(top - bottom);
-  while (n <= bottom) {
-    n += difference;
-  }
-  while (n > top) {
-    n -= difference;
-  }
-  return n;
-}
-
-/* Add to a number without overflowing up or down from min/max
-	---------------------------------------- */
-
-function n_add(n1, n2, t1, t2) {
-  var dif = abs(t2 - t1),
-    na = n1 + n2;
-  while (na < t1) {
-    na += dif;
-  }
-  while (na >= t2) {
-    na -= dif;
-  }
-  return na;
-}
-
-/* Add to an angle without overflowing up or down from 0-360
-	---------------------------------------- */
-
-function angle_add(angle, add) {
-  if (!angle) {
-    angle = 0;
-  }
-  return n_add(angle, add, 0, 360);
-}
-
-/* Move number towards a new number with loop
-	---------------------------------------- */
-
-function increment_num(current, target, bottom, top, speed) {
-  var diff = n_diff(current, target, bottom, top); // get shortest route to number
-  move = min(abs(diff) / 10, 4) * speed; // calculate how much to move
-
-  // if difference is less then movement, return target
-  if (abs(diff) < move) {
-    return target;
-  }
-
-  // add or subtract movement
-  move = diff < 0 ? -move : move;
-  return n_add(current, move, bottom, top);
-}
-
-/* Move angle towards a new angle
-	---------------------------------------- */
-
-function increment_angle(old_angle, new_angle, speed) {
-  return increment_num(old_angle, new_angle, 0, 360, speed);
-}
-
-/* If a point is within a circle
-	---------------------------------------- */
-
-function in_circle(x, y, cx, cy, radius) {
-  return get_distance(x, y, cx, cy) < radius;
-}
-
-/* Plot a course
-	---------------------------------------- */
-
-function plot_course(x, y, sx, sy, extend) {
-  // get initial speed
-  var extend = extend ? extend : 0,
-    speed = get_speed(sx, sy);
-
-  // if no distance then do nothing
-  if (speed == 0) {
-    return { move: false };
-  }
-
-  // calculate increments
-  var increment_x = sx / speed,
-    increment_y = sy / speed,
-    new_x = x - increment_x * extend,
-    new_y = y - increment_y * extend,
-    points = [{ x: new_x, y: new_y }];
-
-  // iterate through path and record points
-  for (var i = 0; i < speed + extend * 2; i++) {
-    (new_x += increment_x), (new_y += increment_y);
-    points.push({
-      x: new_x,
-      y: new_y
-    });
-  }
-
-  // return point array
-  return {
-    move: true,
-    points: points
-  };
-}
-
-/* translate co-ordinates by an angle
-	---------------------------------------- */
-
-function rotate_coords(x, y, cx, cy, angle) {
-  var r = (pi / 180) * angle;
-  return {
-    x: cos(r) * (x - cx) + sin(r) * (y - cy) + cx,
-    y: cos(r) * (y - cy) - sin(r) * (x - cx) + cy
-  };
-}
-
-/* ========================================================================
-    Misc Functions
- ========================================================================== */
-
-/* Duplicate object
-	---------------------------------------- */
-
-function duplicate_obj(obj) {
-  return JSON.parse(JSON.stringify(obj));
-}
-
-/* Prevent array merging
-	---------------------------------------- */
-
-function dont_merge(destination, source) {
-  if (!source) {
-    return destination;
-  } else {
-    return source;
-  }
-}
-
-/* Add space to a string
-	---------------------------------------- */
-
-function str_space(str) {
-  var new_str = "";
-  for (var i = 0; i < str.length; i++) {
-    var add = i == str.length - 1 ? "" : "\u200A";
-    new_str += str[i] + add;
-  }
-  return new_str;
-}
-
-/* Log multiple values
-	---------------------------------------- */
-
-function clog(
-  s1,
-  s2,
-  s3,
-  s4,
-  s5,
-  s6,
-  s7,
-  s8,
-  s9,
-  s10,
-  s11,
-  s12,
-  s13,
-  s14,
-  s15
-) {
-  var str = s1;
-  if (s2 != undefined) {
-    str += " | " + s2;
-  }
-  if (s3 != undefined) {
-    str += " | " + s3;
-  }
-  if (s4 != undefined) {
-    str += " | " + s4;
-  }
-  if (s5 != undefined) {
-    str += " | " + s5;
-  }
-  if (s6 != undefined) {
-    str += " | " + s6;
-  }
-  if (s7 != undefined) {
-    str += " | " + s7;
-  }
-  if (s8 != undefined) {
-    str += " | " + s8;
-  }
-  if (s9 != undefined) {
-    str += " | " + s9;
-  }
-  if (s10 != undefined) {
-    str += " | " + s10;
-  }
-  if (s11 != undefined) {
-    str += " | " + s11;
-  }
-  if (s12 != undefined) {
-    str += " | " + s12;
-  }
-  if (s13 != undefined) {
-    str += " | " + s13;
-  }
-  if (s14 != undefined) {
-    str += " | " + s14;
-  }
-  if (s15 != undefined) {
-    str += " | " + s15;
-  }
-  console.log(str);
-}
-
 /* ========================================================================
     Actions
  ========================================================================== */
@@ -1735,7 +1272,7 @@ core.prototype.init_player = function(player_id, state) {
   if (this.scheme.spawn.length > 0) {
     var pos = this.scheme.spawn[rand(0, this.scheme.spawn.length)];
   } else {
-    var pos = this.map.air_find_spot();
+    var pos = this.map.next_to_land();
   }
   obj.type = "player";
   obj.grounded = false;
@@ -2233,6 +1770,469 @@ core.prototype.unpack_explosion = function(state, str) {
 
   this.create_explosion(props, state);
 };
+
+function isMergeableObject(val) {
+  var nonNullObject = val && typeof val === "object";
+
+  return (
+    nonNullObject &&
+    Object.prototype.toString.call(val) !== "[object RegExp]" &&
+    Object.prototype.toString.call(val) !== "[object Date]"
+  );
+}
+
+function emptyTarget(val) {
+  return Array.isArray(val) ? [] : {};
+}
+
+function cloneIfNecessary(value, optionsArgument) {
+  var clone = optionsArgument && optionsArgument.clone === true;
+  return clone && isMergeableObject(value)
+    ? deepmerge(emptyTarget(value), value, optionsArgument)
+    : value;
+}
+
+function defaultArrayMerge(target, source, optionsArgument) {
+  var destination = target.slice();
+  source.forEach(function(e, i) {
+    if (typeof destination[i] === "undefined") {
+      destination[i] = cloneIfNecessary(e, optionsArgument);
+    } else if (isMergeableObject(e)) {
+      destination[i] = deepmerge(target[i], e, optionsArgument);
+    } else if (target.indexOf(e) === -1) {
+      destination.push(cloneIfNecessary(e, optionsArgument));
+    }
+  });
+  return destination;
+}
+
+function mergeObject(target, source, optionsArgument) {
+  var destination = {};
+  if (isMergeableObject(target)) {
+    Object.keys(target).forEach(function(key) {
+      destination[key] = cloneIfNecessary(target[key], optionsArgument);
+    });
+  }
+  Object.keys(source).forEach(function(key) {
+    if (!isMergeableObject(source[key]) || !target[key]) {
+      destination[key] = cloneIfNecessary(source[key], optionsArgument);
+    } else {
+      destination[key] = deepmerge(target[key], source[key], optionsArgument);
+    }
+  });
+  return destination;
+}
+
+function deepmerge(target, source, optionsArgument) {
+  var array = Array.isArray(source);
+  var options = optionsArgument || { arrayMerge: defaultArrayMerge };
+  var arrayMerge = options.arrayMerge || defaultArrayMerge;
+
+  if (array) {
+    return Array.isArray(target)
+      ? arrayMerge(target, source, optionsArgument)
+      : cloneIfNecessary(source, optionsArgument);
+  } else {
+    return mergeObject(target, source, optionsArgument);
+  }
+}
+
+deepmerge.all = function deepmergeAll(array, optionsArgument) {
+  if (!Array.isArray(array) || array.length < 2) {
+    throw new Error(
+      "first argument should be an array with at least two elements"
+    );
+  }
+
+  // we are sure there are at least 2 values, so it is safe to have no initial value
+  return array.reduce(function(prev, next) {
+    return deepmerge(prev, next, optionsArgument);
+  });
+};
+
+/* ========================================================================
+    Math Functions
+ ========================================================================== */
+
+/* Shorten "Math" functions
+	---------------------------------------- */
+
+function cos(n) {
+  return Math.cos(n);
+}
+function sin(n) {
+  return Math.sin(n);
+}
+function pow(n) {
+  return Math.pow(n);
+}
+function abs(n) {
+  return Math.abs(n);
+}
+function sqr(n) {
+  return Math.pow(n, 2);
+}
+function sqrt(n) {
+  return Math.sqrt(n);
+}
+function round(n) {
+  return Math.round(n);
+}
+function floor(n) {
+  return Math.floor(n);
+}
+function ceil(n) {
+  return Math.ceil(n);
+}
+function atan2(n1, n2) {
+  return Math.atan2(n1, n2);
+}
+function min(n1, n2) {
+  return Math.min(n1, n2);
+}
+function max(n1, n2) {
+  return Math.max(n1, n2);
+}
+function rand(n1, n2) {
+  return floor(Math.random() * n2) + n1;
+}
+var pi = Math.PI;
+
+/* Fix number to decimal places
+	---------------------------------------- */
+
+Number.prototype.fixed = function(n) {
+  n = n || 2;
+  return parseFloat(this.toFixed(n));
+};
+
+/* Add preceding zeroes to number
+	---------------------------------------- */
+
+function preceding_zeroes(n, length) {
+  var length = length || 2;
+  var n = n.toString();
+  while (n.length < length) {
+    n = "0" + n;
+  }
+  return n;
+}
+
+/* Is number
+	---------------------------------------- */
+
+function is_numeric(n) {
+  return !isNaN(parseFloat(n)) && isFinite(n);
+}
+
+/* Get distance between two points
+	---------------------------------------- */
+
+function get_speed(sx, sy) {
+  return round(sqrt(sqr(sx) + sqr(sy)));
+}
+
+function get_distance(x1, y1, x2, y2) {
+  var dx = x2 - x1,
+    dy = y2 - y1;
+  return get_speed(dx, dy);
+}
+
+/* Check speed limit
+	---------------------------------------- */
+
+function check_speed(sx, sy, speed) {
+  var d = get_distance(0, 0, sx, sy),
+    ns = {
+      x: sx,
+      y: sy,
+      total: d
+    };
+  if (speed < d) {
+    var multi = speed / d;
+    ns.x = sx * multi;
+    ns.y = sy * multi;
+    ns.total = speed;
+  }
+  return ns;
+}
+
+/* Get Heading Angle From X and Y Speed
+	// 0 = left, 360 = left
+	---------------------------------------- */
+
+function get_angle(sx, sy) {
+  return (((atan2(sy, sx) * 180) / pi) % 360) + 180;
+}
+
+function get_heading(x1, y1, x2, y2) {
+  var xs = x2 - x1,
+    ys = y2 - y1;
+  return get_angle(xs, ys);
+}
+
+/* Get X and Y speed from heading and velocity
+	---------------------------------------- */
+
+function xy_speed(angle, speed) {
+  var a = angle_add(angle, 180),
+    r = (a / 180) * pi;
+  return {
+    x: speed * cos(r),
+    y: speed * sin(r)
+  };
+}
+
+/* Get X and Y offset from heading and velocity
+	---------------------------------------- */
+
+function xy_offset(angle, sx, sy) {
+  var xy1 = xy_speed(angle, sx);
+  var xy2 = xy_speed(angle_add(angle, 90), sy);
+  return {
+    x: xy1.x + xy2.x,
+    y: xy1.y + xy2.y
+  };
+}
+
+/* Get difference between two numbers in a loop
+	---------------------------------------- */
+
+function n_diff(current, target, bottom, top) {
+  if (current == target) {
+    return 0;
+  }
+
+  var scale = abs(top - bottom), // get total size of the loop
+    c_current = current - bottom, // correct current for negative numbers
+    c_target = target - bottom, // correct target for negative numbers
+    n1 = (c_target + scale - c_current) % scale, // get difference when adding
+    n2 = (c_current + scale - c_target) % scale; // get difference when subtracting
+
+  // return smallest distance
+  if (n1 < n2) {
+    return n1;
+  } else {
+    return -n2;
+  }
+}
+
+/* Auto loop a number
+	---------------------------------------- */
+
+function n_loop(n, bottom, top) {
+  var difference = abs(top - bottom);
+  while (n <= bottom) {
+    n += difference;
+  }
+  while (n > top) {
+    n -= difference;
+  }
+  return n;
+}
+
+/* Add to a number without overflowing up or down from min/max
+	---------------------------------------- */
+
+function n_add(n1, n2, t1, t2) {
+  var dif = abs(t2 - t1),
+    na = n1 + n2;
+  while (na < t1) {
+    na += dif;
+  }
+  while (na >= t2) {
+    na -= dif;
+  }
+  return na;
+}
+
+/* Add to an angle without overflowing up or down from 0-360
+	---------------------------------------- */
+
+function angle_add(angle, add) {
+  if (!angle) {
+    angle = 0;
+  }
+  return n_add(angle, add, 0, 360);
+}
+
+/* Move number towards a new number with loop
+	---------------------------------------- */
+
+function increment_num(current, target, bottom, top, speed) {
+  var diff = n_diff(current, target, bottom, top); // get shortest route to number
+  move = min(abs(diff) / 10, 4) * speed; // calculate how much to move
+
+  // if difference is less then movement, return target
+  if (abs(diff) < move) {
+    return target;
+  }
+
+  // add or subtract movement
+  move = diff < 0 ? -move : move;
+  return n_add(current, move, bottom, top);
+}
+
+/* Move angle towards a new angle
+	---------------------------------------- */
+
+function increment_angle(old_angle, new_angle, speed) {
+  return increment_num(old_angle, new_angle, 0, 360, speed);
+}
+
+/* If a point is within a circle
+	---------------------------------------- */
+
+function in_circle(x, y, cx, cy, radius) {
+  return get_distance(x, y, cx, cy) < radius;
+}
+
+/* Plot a course
+	---------------------------------------- */
+
+function plot_course(x, y, sx, sy, extend) {
+  // get initial speed
+  var extend = extend ? extend : 0,
+    speed = get_speed(sx, sy);
+
+  // if no distance then do nothing
+  if (speed == 0) {
+    return { move: false };
+  }
+
+  // calculate increments
+  var increment_x = sx / speed,
+    increment_y = sy / speed,
+    new_x = x - increment_x * extend,
+    new_y = y - increment_y * extend,
+    points = [{ x: new_x, y: new_y }];
+
+  // iterate through path and record points
+  for (var i = 0; i < speed + extend * 2; i++) {
+    (new_x += increment_x), (new_y += increment_y);
+    points.push({
+      x: new_x,
+      y: new_y
+    });
+  }
+
+  // return point array
+  return {
+    move: true,
+    points: points
+  };
+}
+
+/* translate co-ordinates by an angle
+	---------------------------------------- */
+
+function rotate_coords(x, y, cx, cy, angle) {
+  var r = (pi / 180) * angle;
+  return {
+    x: cos(r) * (x - cx) + sin(r) * (y - cy) + cx,
+    y: cos(r) * (y - cy) - sin(r) * (x - cx) + cy
+  };
+}
+
+/* ========================================================================
+    Misc Functions
+ ========================================================================== */
+
+/* Duplicate object
+	---------------------------------------- */
+
+function duplicate_obj(obj) {
+  return JSON.parse(JSON.stringify(obj));
+}
+
+/* Prevent array merging
+	---------------------------------------- */
+
+function dont_merge(destination, source) {
+  if (!source) {
+    return destination;
+  } else {
+    return source;
+  }
+}
+
+/* Add space to a string
+	---------------------------------------- */
+
+function str_space(str) {
+  var new_str = "";
+  for (var i = 0; i < str.length; i++) {
+    var add = i == str.length - 1 ? "" : "\u200A";
+    new_str += str[i] + add;
+  }
+  return new_str;
+}
+
+/* Log multiple values
+	---------------------------------------- */
+
+function clog(
+  s1,
+  s2,
+  s3,
+  s4,
+  s5,
+  s6,
+  s7,
+  s8,
+  s9,
+  s10,
+  s11,
+  s12,
+  s13,
+  s14,
+  s15
+) {
+  var str = s1;
+  if (s2 != undefined) {
+    str += " | " + s2;
+  }
+  if (s3 != undefined) {
+    str += " | " + s3;
+  }
+  if (s4 != undefined) {
+    str += " | " + s4;
+  }
+  if (s5 != undefined) {
+    str += " | " + s5;
+  }
+  if (s6 != undefined) {
+    str += " | " + s6;
+  }
+  if (s7 != undefined) {
+    str += " | " + s7;
+  }
+  if (s8 != undefined) {
+    str += " | " + s8;
+  }
+  if (s9 != undefined) {
+    str += " | " + s9;
+  }
+  if (s10 != undefined) {
+    str += " | " + s10;
+  }
+  if (s11 != undefined) {
+    str += " | " + s11;
+  }
+  if (s12 != undefined) {
+    str += " | " + s12;
+  }
+  if (s13 != undefined) {
+    str += " | " + s13;
+  }
+  if (s14 != undefined) {
+    str += " | " + s14;
+  }
+  if (s15 != undefined) {
+    str += " | " + s15;
+  }
+  console.log(str);
+}
 
 var config = config || {};
 config.animations = {
@@ -3087,9 +3087,8 @@ config.objects = {
     size: 20,
     weight: 0,
     damage: 16,
-    timeout: 26,
+    timeout: 24,
     player_lock: true,
-    stop: 24,
     events: {
       ground: "slide"
     },
@@ -3212,7 +3211,7 @@ config.objects = {
   pumpkin: {
     size: 10,
     weight: 1,
-    timeout: 120,
+    timeout: 72,
     damage: 70,
     events: {
       ground: "bounce",
@@ -4267,10 +4266,9 @@ config.weapons = {
     armoury_sprite: "bazooka-shell",
     sprite: "bazooka",
     fire_audio: "shoot",
-    auto_follow: true,
     speed: 24,
     object: "bazooka",
-    cooldown: 40,
+    cooldown: 15,
     recoil: 0.2,
     inertia: 0.5
   },
@@ -4280,10 +4278,9 @@ config.weapons = {
     sprite: "throw",
     fire_audio: "throw",
     fire_sprite: "throw-fire",
-    auto_follow: true,
     speed: 24,
     object: "grenade",
-    cooldown: 30,
+    cooldown: 15,
     recoil: 0,
     inertia: 0.5
   },
@@ -4293,9 +4290,9 @@ config.weapons = {
     sprite: "punch",
     fire_audio: "throw",
     fire_body_sprite: "superman",
-    speed: 24,
+    speed: 16,
     object: "punch",
-    cooldown: 120,
+    cooldown: 60,
     recoil: 0,
     inertia: 0.5
   },
@@ -4305,8 +4302,7 @@ config.weapons = {
     sprite: "throw",
     fire_audio: "throw",
     fire_sprite: "throw-fire",
-    auto_follow: true,
-    speed: 30,
+    speed: 15,
     object: "pumpkin",
     cooldown: 48,
     recoil: 0,
@@ -4363,11 +4359,6 @@ schemes.deathmatch = {
     }
   },
   weapons: {
-    dig: {
-      start_count: -1,
-      crate_chance: 0,
-      crate_count: -1
-    },
     phaser: {
       start_count: -1,
       crate_chance: 0,
@@ -4384,6 +4375,11 @@ schemes.deathmatch = {
       crate_count: -1
     },
     punch: {
+      start_count: -1,
+      crate_chance: 0,
+      crate_count: -1
+    },
+    dig: {
       start_count: -1,
       crate_chance: 0,
       crate_count: -1
@@ -4456,26 +4452,26 @@ schemes.default = {
       1000
     ],
     health: [
-      100,
-      120,
-      120,
-      120,
-      140,
-      140,
-      140,
-      140,
-      160,
-      180,
-      200,
-      200,
-      200,
-      200,
-      220,
-      220,
-      220,
-      220,
-      240,
-      300
+      500,
+      520,
+      520,
+      520,
+      540,
+      540,
+      540,
+      540,
+      560,
+      580,
+      600,
+      600,
+      600,
+      600,
+      620,
+      620,
+      620,
+      620,
+      640,
+      1000
     ],
     damage: [
       0,
@@ -4573,11 +4569,6 @@ schemes.default = {
     }
   },
   weapons: {
-    dig: {
-      start_count: -1,
-      crate_chance: 0,
-      crate_count: -1
-    },
     phaser: {
       start_count: 0,
       crate_chance: 0,
@@ -4598,6 +4589,11 @@ schemes.default = {
       crate_chance: 0,
       crate_count: -1
     },
+    dig: {
+      start_count: -1,
+      crate_chance: 0,
+      crate_count: -1
+    },
     pumpkin: {
       start_count: 0,
       crate_chance: 0,
@@ -4610,11 +4606,11 @@ schemes.default = {
     }
   },
   armoury: [
-    "dig",
     "phaser",
     "bazookoid",
     "grenade",
     "punch",
+    "dig",
     "pumpkin",
     "paingiver"
   ],
@@ -5460,28 +5456,92 @@ core_map.prototype.get_gravity_angle = function(x, y) {
 
 core_map.prototype.get_angle_offsets = function(a) {
   if (a > 22 && a <= 67) {
-    return [[-1, -1], [0, -1], [-1, 0], [1, -1], [-1, 1], [1, 0], [0, 1]];
+    return [
+      [-1, -1],
+      [0, -1],
+      [-1, 0],
+      [1, -1],
+      [-1, 1],
+      [1, 0],
+      [0, 1]
+    ];
   } // up left
   if (a > 67 && a <= 112) {
-    return [[0, -1], [-1, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [1, 1]];
+    return [
+      [0, -1],
+      [-1, -1],
+      [1, -1],
+      [-1, 0],
+      [1, 0],
+      [-1, 1],
+      [1, 1]
+    ];
   } // up
   if (a > 112 && a <= 157) {
-    return [[1, -1], [0, -1], [1, 0], [-1, -1], [1, 1], [-1, 0], [0, 1]];
+    return [
+      [1, -1],
+      [0, -1],
+      [1, 0],
+      [-1, -1],
+      [1, 1],
+      [-1, 0],
+      [0, 1]
+    ];
   } // up right
   if (a > 157 && a <= 202) {
-    return [[1, 0], [1, -1], [1, 1], [0, -1], [0, 1], [-1, -1], [-1, 1]];
+    return [
+      [1, 0],
+      [1, -1],
+      [1, 1],
+      [0, -1],
+      [0, 1],
+      [-1, -1],
+      [-1, 1]
+    ];
   } // right
   if (a > 202 && a <= 247) {
-    return [[1, 1], [1, 0], [0, 1], [1, -1], [-1, 1], [0, -1], [-1, 0]];
+    return [
+      [1, 1],
+      [1, 0],
+      [0, 1],
+      [1, -1],
+      [-1, 1],
+      [0, -1],
+      [-1, 0]
+    ];
   } // down right
   if (a > 247 && a <= 292) {
-    return [[0, 1], [-1, 1], [1, 1], [-1, 0], [1, 0], [-1, -1], [1, -1]];
+    return [
+      [0, 1],
+      [-1, 1],
+      [1, 1],
+      [-1, 0],
+      [1, 0],
+      [-1, -1],
+      [1, -1]
+    ];
   } // down
   if (a > 292 && a <= 337) {
-    return [[-1, 1], [-1, 0], [0, 1], [-1, -1], [1, 1], [0, -1], [1, 0]];
+    return [
+      [-1, 1],
+      [-1, 0],
+      [0, 1],
+      [-1, -1],
+      [1, 1],
+      [0, -1],
+      [1, 0]
+    ];
   } // down left
   if (a > 337 || a <= 22) {
-    return [[-1, 0], [-1, -1], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 1]];
+    return [
+      [-1, 0],
+      [-1, -1],
+      [-1, 1],
+      [0, -1],
+      [0, 1],
+      [1, -1],
+      [1, 1]
+    ];
   } // left
 };
 
@@ -5726,6 +5786,22 @@ core_map.prototype.air_find_spot = function() {
 
   // failed to find a spot
   return false;
+};
+
+/* Get random spot next to land;
+	---------------------------------------- */
+
+core_map.prototype.next_to_land = function() {
+  const start = rand(0, this.arr.length - 1);
+  for (let i = 0; i < this.arr.length; i++) {
+    const actualIndex = n_loop(start + i, 0, this.arr.length - 1);
+    const y = floor(actualIndex / this.w);
+    const x = actualIndex - y * this.w;
+    if (this.ground_pixel(x, y)) {
+      return { x: x, y: y };
+    }
+  }
+  return false; // failed
 };
 
 /* Get random ground spot

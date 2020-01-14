@@ -10,8 +10,7 @@ function game(
   map,
   players,
   player_id,
-  top_event,
-  onboarding
+  top_event
 ) {
   // args
   this.c = config;
@@ -24,7 +23,7 @@ function game(
   this.player_id = player_id;
   this.leader = null;
   this.top_event = top_event;
-  this.onboarding = onboarding;
+  this.onboarding = "move"; // will go to jump and shoot
 
   // game running
   this.active = false;
@@ -46,6 +45,7 @@ function game(
   this.init_score();
   this.init_alert();
   this.init_audio();
+  this.init_onboarding();
 
   // things to display
   this.objects = {};

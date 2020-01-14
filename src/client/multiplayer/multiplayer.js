@@ -10,8 +10,7 @@ function multiplayer(
   name,
   watcher,
   run_event,
-  sockets,
-  onboarding
+  sockets
 ) {
   // setup
   this.assets = assets;
@@ -24,7 +23,6 @@ function multiplayer(
   this.sockets = sockets;
   this.scheme = null;
   this.lag = 0;
-  this.onboarding = onboarding;
 
   // loop
   this.fps = 24;
@@ -159,8 +157,7 @@ multiplayer.prototype.game_start_loaded = function(map) {
     new_map,
     this.players_ref,
     this.player_id,
-    this.top_event,
-    this.onboarding
+    this.top_event
   );
   append(this.div, this.game.div);
 

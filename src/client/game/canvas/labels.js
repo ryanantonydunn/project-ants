@@ -139,7 +139,7 @@ game.prototype.set_label_health = function(label, player_id) {
   label.text = text;
 
   // draw label
-  label.w = round(level / 2) + 6;
+  label.w = round(level / 5) + 6;
   label.h = 8;
   label.canv.width = label.w;
   label.canv.height = label.h;
@@ -148,7 +148,7 @@ game.prototype.set_label_health = function(label, player_id) {
   label.cont.fillStyle = "rgba(0,0,0,0.8)";
   label.cont.fillRect(1, 1, label.w - 2, label.h - 2);
   label.cont.fillStyle = "#e41a1a";
-  label.cont.fillRect(3, 3, round(player.health / 2), 2);
+  label.cont.fillRect(3, 3, round(player.health / 5), 2);
 
   // are we hiding it
   label.hide = player.dead;

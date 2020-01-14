@@ -110,8 +110,7 @@ app.prototype.init_room = function(assets) {
       this.nickname,
       this.watch,
       this.run_event,
-      this.sockets,
-      new onboarding()
+      this.sockets
     );
     if (this.watch) {
       this.sockets.message_send("watcher", []);

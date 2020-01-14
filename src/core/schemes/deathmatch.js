@@ -29,11 +29,6 @@ schemes.deathmatch = {
     }
   },
   weapons: {
-    dig: {
-      start_count: -1,
-      crate_chance: 0,
-      crate_count: -1
-    },
     phaser: {
       start_count: -1,
       crate_chance: 0,
@@ -50,6 +45,11 @@ schemes.deathmatch = {
       crate_count: -1
     },
     punch: {
+      start_count: -1,
+      crate_chance: 0,
+      crate_count: -1
+    },
+    dig: {
       start_count: -1,
       crate_chance: 0,
       crate_count: -1

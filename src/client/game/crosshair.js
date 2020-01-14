@@ -8,7 +8,7 @@
 
 game.prototype.init_crosshair = function() {
   this.crosshair = 0;
-  this.crosshair_source = "button";
+  // this.crosshair_source = "button";
 };
 
 /* Calculate crosshair from cursor position

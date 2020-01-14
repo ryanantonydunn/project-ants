@@ -9,25 +9,29 @@
 app.prototype.init_settings = function() {
   var self = this;
 
-  // corner button
-  this.icon_settings = element({ class: "settings" });
-  this.icon_settings_img = element({
-    type: "img",
-    src: this.assets_url + "/images/cog.png"
+  // audio button
+  this.icon_settings = element({
+    class: "settings_1",
+    text: "🔉"
   });
-  append(this.div, this.icon_settings);
-  append(this.icon_settings, this.icon_settings_img);
-
-  this.settings_visible = false;
-  this.icon_settings_img.onclick = function() {
-    self.toggle_settings_screen();
+  this.icon_settings.onclick = function() {
+    if (self.audio.volume === 0) {
+      self.audio.set_global_volume(0.1);
+      self.icon_settings.innerHTML = "🔉";
+    } else {
+      self.audio.set_global_volume(0);
+      self.icon_settings.innerHTML = "🔇";
+    }
   };
+  append(this.div, this.icon_settings);
 
+  // fullscreen
   this.icon_settings_fullscreen = element({
+    class: "settings_2",
     type: "img",
     src: this.assets_url + "/images/fullscreen.png"
   });
-  append(this.icon_settings, this.icon_settings_fullscreen);
+  append(this.div, this.icon_settings_fullscreen);
   this.icon_settings_fullscreen.onclick = function() {
     var isFullscreen = document.fullscreenElement !== null;
     if (isFullscreen) {
@@ -36,72 +40,4 @@ app.prototype.init_settings = function() {
       document.body.requestFullscreen();
     }
   };
-
-
-
-
-  // box
-  this.div_settings = element({ class: "full full_bg" });
-  this.div_settings_cont = element({
-    class: "cont_center div_controls",
-    text: "<div class='top_message'>Settings</div>"
-  });
-  append(this.div, this.div_settings);
-  append(this.div_settings, this.div_settings_cont);
-  hide(this.div_settings);
-
-  // volume
-  this.div_volume = element({ text: "<h3>Volume</h3>" });
-  this.input_volume = element({ type: "input" });
-  this.input_volume.type = "range";
-  this.input_volume.setAttribute("min", 0);
-  this.input_volume.setAttribute("max", 1);
-  this.input_volume.setAttribute("step", 0.1);
-  this.input_volume.value = this.audio.volume;
-  append(this.div_settings_cont, this.div_volume);
-  append(this.div_volume, this.input_volume);
-
-  this.input_volume.onchange = function(e) {
-    self.audio.set_global_volume(this.value);
-  };
-
-  // controls
-  var ctext = "<h3>Controls (Mouse + Keyboard)</h3>";
-  ctext += "<dl>";
-  ctext += "<dt>Move</dt><dd>Left Click</dd>";
-  ctext += "<dt>Jump</dt><dd>Spacebar</dd>";
-  ctext += "<dt>Shoot</dt><dd>Right Click / Alt + Left Click</dd>";
-  ctext += "<dt>Select Weapon</dt><dd>1-9 / Scroll Wheel</dd>";
-  ctext += "<dt>Follow Weapons</dt><dd>F</dd>";
-  ctext += "<dt>Free Cam</dt><dd>Middle Click</dd>";
-  ctext += "</dl>";
-  ctext += "<h3>Controls (Touchscreen)</h3>";
-  ctext += "<dl>";
-  ctext += "<dt>Move</dt><dd>Tap</dd>";
-  ctext += "<dt>Shoot</dt><dd>Double Tap</dd>";
-  ctext += "<dt>Jump</dt><dd>Two finger tap</dd>";
-  ctext += "</dl>";
-
-  this.div_controls = element({ text: ctext });
-  append(this.div_settings_cont, this.div_controls);
-
-  // close button
-  this.div_settings_buttons = element({ class: "buttons" });
-  this.button_close_settings = element({ type: "button", text: "Close" });
-  append(this.div_settings_cont, this.div_settings_buttons);
-  append(this.div_settings_buttons, this.button_close_settings);
-
-  this.button_close_settings.onclick = function() {
-    self.settings_visible = false;
-    hide(self.div_settings);
-  };
-};
-
-app.prototype.toggle_settings_screen = function() {
-  if ((this.settings_visible = !this.settings_visible)) {
-    this.audio.play("bleep1", 0.8);
-    show(this.div_settings);
-  } else {
-    hide(this.div_settings);
-  }
 };

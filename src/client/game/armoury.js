@@ -129,6 +129,11 @@ game.prototype.weapon_select = function(type, no_highlight) {
     show(this.armoury.player);
   }
 
+  // onboarding
+  if (this.onboarding === "selectWeapon") {
+    this.set_onboarding("selectWeapon");
+  }
+
   return type;
 };
 

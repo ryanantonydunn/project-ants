@@ -34,26 +34,26 @@ schemes.default = {
       1000
     ],
     health: [
-      100,
-      120,
-      120,
-      120,
-      140,
-      140,
-      140,
-      140,
-      160,
-      180,
-      200,
-      200,
-      200,
-      200,
-      220,
-      220,
-      220,
-      220,
-      240,
-      300
+      500,
+      520,
+      520,
+      520,
+      540,
+      540,
+      540,
+      540,
+      560,
+      580,
+      600,
+      600,
+      600,
+      600,
+      620,
+      620,
+      620,
+      620,
+      640,
+      1000
     ],
     damage: [
       0,
@@ -151,11 +151,6 @@ schemes.default = {
     }
   },
   weapons: {
-    dig: {
-      start_count: -1,
-      crate_chance: 0,
-      crate_count: -1
-    },
     phaser: {
       start_count: 0,
       crate_chance: 0,
@@ -176,6 +171,11 @@ schemes.default = {
       crate_chance: 0,
       crate_count: -1
     },
+    dig: {
+      start_count: -1,
+      crate_chance: 0,
+      crate_count: -1
+    },
     pumpkin: {
       start_count: 0,
       crate_chance: 0,
@@ -188,11 +188,11 @@ schemes.default = {
     }
   },
   armoury: [
-    "dig",
     "phaser",
     "bazookoid",
     "grenade",
     "punch",
+    "dig",
     "pumpkin",
     "paingiver"
   ],

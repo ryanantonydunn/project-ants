@@ -366,9 +366,8 @@ config.objects = {
     size: 20,
     weight: 0,
     damage: 16,
-    timeout: 26,
+    timeout: 24,
     player_lock: true,
-    stop: 24,
     events: {
       ground: "slide"
     },
@@ -491,7 +490,7 @@ config.objects = {
   pumpkin: {
     size: 10,
     weight: 1,
-    timeout: 120,
+    timeout: 72,
     damage: 70,
     events: {
       ground: "bounce",

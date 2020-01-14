@@ -7,28 +7,92 @@
 
 core_map.prototype.get_angle_offsets = function(a) {
   if (a > 22 && a <= 67) {
-    return [[-1, -1], [0, -1], [-1, 0], [1, -1], [-1, 1], [1, 0], [0, 1]];
+    return [
+      [-1, -1],
+      [0, -1],
+      [-1, 0],
+      [1, -1],
+      [-1, 1],
+      [1, 0],
+      [0, 1]
+    ];
   } // up left
   if (a > 67 && a <= 112) {
-    return [[0, -1], [-1, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [1, 1]];
+    return [
+      [0, -1],
+      [-1, -1],
+      [1, -1],
+      [-1, 0],
+      [1, 0],
+      [-1, 1],
+      [1, 1]
+    ];
   } // up
   if (a > 112 && a <= 157) {
-    return [[1, -1], [0, -1], [1, 0], [-1, -1], [1, 1], [-1, 0], [0, 1]];
+    return [
+      [1, -1],
+      [0, -1],
+      [1, 0],
+      [-1, -1],
+      [1, 1],
+      [-1, 0],
+      [0, 1]
+    ];
   } // up right
   if (a > 157 && a <= 202) {
-    return [[1, 0], [1, -1], [1, 1], [0, -1], [0, 1], [-1, -1], [-1, 1]];
+    return [
+      [1, 0],
+      [1, -1],
+      [1, 1],
+      [0, -1],
+      [0, 1],
+      [-1, -1],
+      [-1, 1]
+    ];
   } // right
   if (a > 202 && a <= 247) {
-    return [[1, 1], [1, 0], [0, 1], [1, -1], [-1, 1], [0, -1], [-1, 0]];
+    return [
+      [1, 1],
+      [1, 0],
+      [0, 1],
+      [1, -1],
+      [-1, 1],
+      [0, -1],
+      [-1, 0]
+    ];
   } // down right
   if (a > 247 && a <= 292) {
-    return [[0, 1], [-1, 1], [1, 1], [-1, 0], [1, 0], [-1, -1], [1, -1]];
+    return [
+      [0, 1],
+      [-1, 1],
+      [1, 1],
+      [-1, 0],
+      [1, 0],
+      [-1, -1],
+      [1, -1]
+    ];
   } // down
   if (a > 292 && a <= 337) {
-    return [[-1, 1], [-1, 0], [0, 1], [-1, -1], [1, 1], [0, -1], [1, 0]];
+    return [
+      [-1, 1],
+      [-1, 0],
+      [0, 1],
+      [-1, -1],
+      [1, 1],
+      [0, -1],
+      [1, 0]
+    ];
   } // down left
   if (a > 337 || a <= 22) {
-    return [[-1, 0], [-1, -1], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 1]];
+    return [
+      [-1, 0],
+      [-1, -1],
+      [-1, 1],
+      [0, -1],
+      [0, 1],
+      [1, -1],
+      [1, 1]
+    ];
   } // left
 };
 
@@ -273,6 +337,22 @@ core_map.prototype.air_find_spot = function() {
 
   // failed to find a spot
   return false;
+};
+
+/* Get random spot next to land;
+	---------------------------------------- */
+
+core_map.prototype.next_to_land = function() {
+  const start = rand(0, this.arr.length - 1);
+  for (let i = 0; i < this.arr.length; i++) {
+    const actualIndex = n_loop(start + i, 0, this.arr.length - 1);
+    const y = floor(actualIndex / this.w);
+    const x = actualIndex - y * this.w;
+    if (this.ground_pixel(x, y)) {
+      return { x: x, y: y };
+    }
+  }
+  return false; // failed
 };
 
 /* Get random ground spot

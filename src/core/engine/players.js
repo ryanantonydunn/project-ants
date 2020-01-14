@@ -91,7 +91,7 @@ core.prototype.init_player = function(player_id, state) {
   if (this.scheme.spawn.length > 0) {
     var pos = this.scheme.spawn[rand(0, this.scheme.spawn.length)];
   } else {
-    var pos = this.map.air_find_spot();
+    var pos = this.map.next_to_land();
   }
   obj.type = "player";
   obj.grounded = false;

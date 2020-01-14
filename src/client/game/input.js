@@ -12,21 +12,6 @@ game.prototype.get_input = function() {
     return;
   }
 
-  // set source of crosshair movement
-  if (
-    this.input.active("move_up") ||
-    this.input.active("move_down") ||
-    this.input.active("move_left") ||
-    this.input.active("move_right")
-  ) {
-    this.crosshair_source = "button";
-  } else {
-    if (this.input.cursor_moved) {
-      this.crosshair_source = "cursor";
-    }
-  }
-  this.input.cursor_moved = false;
-
   // get player actions
   var active = false;
   var response = {
@@ -92,45 +77,10 @@ game.prototype.get_input = function() {
 
   // walking restricted actions
   if (this.player_obj.grounded && !active) {
-    // arrow key movement
-    var arrow_angle = -1;
-    if (this.input.active("move_up")) {
-      arrow_angle = 90;
-      if (this.input.active("move_right")) {
-        arrow_angle = 135;
-      }
-      if (this.input.active("move_left")) {
-        arrow_angle = 45;
-      }
-    } else if (this.input.active("move_down")) {
-      arrow_angle = 270;
-      if (this.input.active("move_right")) {
-        arrow_angle = 225;
-      }
-      if (this.input.active("move_left")) {
-        arrow_angle = 305;
-      }
-    } else {
-      if (this.input.active("move_right")) {
-        arrow_angle = 180;
-      }
-      if (this.input.active("move_left")) {
-        arrow_angle = 0;
-      }
-    }
-    if (arrow_angle !== -1) {
-      response.action = "move";
-      response.angle = arrow_angle;
-      active = true;
-    }
-
-    // move crosshair key
     if (this.input.active("move")) {
       response.action = "move";
       active = true;
     }
-
-    // jumping
     if (this.input.active("jump")) {
       response.action = "jump";
       active = true;
@@ -147,7 +97,13 @@ game.prototype.get_input = function() {
   }
 
   // set the onboarding
-  this.onboarding && this.onboarding.set(response.action);
+  if (this.onboarding === "move" && response.action === "move") {
+    this.set_onboarding("move");
+  } else if (this.onboarding === "jump" && response.action === "jump") {
+    this.set_onboarding("jump");
+  } else if (this.onboarding === "shoot" && response.action === "shoot") {
+    this.set_onboarding("shoot");
+  }
 
   return response;
 };
