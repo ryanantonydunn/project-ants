@@ -15,7 +15,7 @@ Project Ants is a multiplayer action browser game with a custom physics engine. 
 - Procedurally generated random maps
 - Map based gravity
 
-![Firing a weapon in Project Ants Game](https://github.com/ryanantonydunn/project-ants/raw/master/public/images/screenshot1.png "Firing a weapon in Project Ants Game")
+![Firing a weapon in Project Ants Game](https://github.com/ryanantonydunn/project-ants/raw/master/public/assets/images/screenshot1.png "Firing a weapon in Project Ants Game")
 
 ## Playable Demo
 
