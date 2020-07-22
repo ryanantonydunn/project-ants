@@ -43,6 +43,7 @@ function input(callback) {
       self.singlePress = true;
       waitForDouble();
       if (e.metaKey || e.ctrlKey) {
+        e.preventDefault();
         self.metaClick = true;
       }
     }
