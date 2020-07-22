@@ -14,7 +14,7 @@ function input(callback) {
   this.doublePress = false;
 
   // mouse move
-  document.body.onmousemove = function(e) {
+  document.body.onmousemove = function (e) {
     if (e.target.id === "game_input") {
       self.cursor.x = e.clientX;
       self.cursor.y = e.clientY;
@@ -26,35 +26,35 @@ function input(callback) {
     if (self.waitingForDouble) {
       self.doublePress = true;
       self.waitingForDouble = false;
-      setTimeout(function() {
+      setTimeout(function () {
         self.doublePress = false;
       }, 20);
     } else {
       self.waitingForDouble = true;
     }
-    setTimeout(function() {
+    setTimeout(function () {
       self.waitingForDouble = false;
     }, 300);
   }
 
   // mouse click
-  document.body.onmousedown = function(e) {
+  document.body.onmousedown = function (e) {
     if (e.target.id === "game_input") {
       self.singlePress = true;
       waitForDouble();
-      if (e.metaKey) {
+      if (e.metaKey || e.ctrlKey) {
         self.metaClick = true;
       }
     }
   };
-  document.body.onmouseup = function(e) {
+  document.body.onmouseup = function (e) {
     self.singlePress = false;
     self.twoFingerTap = false;
     self.metaClick = false;
   };
 
   // touch events
-  document.body.ontouchstart = function(e) {
+  document.body.ontouchstart = function (e) {
     if (e.target.id === "game_input") {
       self.cursor.x = e.touches[0].clientX;
       self.cursor.y = e.touches[0].clientY;
@@ -67,14 +67,14 @@ function input(callback) {
     }
   };
 
-  document.body.ontouchend = function(e) {
+  document.body.ontouchend = function (e) {
     self.singlePress = false;
     self.twoFingerTap = false;
     self.metaClick = false;
   };
 
   // set cursor when touches move
-  document.body.ontouchmove = function(e) {
+  document.body.ontouchmove = function (e) {
     if (e.target.id === "game_input") {
       self.cursor.x = e.touches[0].clientX;
       self.cursor.y = e.touches[0].clientY;
@@ -82,7 +82,7 @@ function input(callback) {
   };
 
   // turn off input when window is not focused
-  window.onblur = function() {
+  window.onblur = function () {
     self.singlePress = false;
     self.twoFingerTap = false;
     self.metaClick = false;
@@ -90,7 +90,7 @@ function input(callback) {
     self.doublePress = false;
   };
 
-  this.active = function(type) {
+  this.active = function (type) {
     if (type === "jump" && self.doublePress) {
       return true;
     }
