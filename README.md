@@ -2,8 +2,6 @@
 
 This project was built a very long time ago and is not representative of current work. This codebase is preserved as a monument - not to be ashamed of our past, but to be proud of how far we've come and what we can accomplish with limited tools.
 
-I am very slowly undertaking a [rewrite of this project](https://github.com/ryanantonydunn/army-ants) when time permits. This will obviously take a while because the codebase is enormous.
-
 # Project Ants
 
 Project Ants is a multiplayer action browser game with a custom physics engine. Its main accomplishments are:
