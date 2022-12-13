@@ -20,8 +20,8 @@ var imagemin = require("gulp-imagemin");
 var merge = require("merge-stream");
 
 // assets output path
-var build = "public";
-var assets = "public/assets";
+var build = "docs";
+var assets = "docs/assets";
 var src = "src";
 
 // are we in production
@@ -32,15 +32,15 @@ const production = !!util.env.production;
 
 var src_sprites = src + "/sprites/**/*.png";
 
-gulp.task("sprites", function() {
+gulp.task("sprites", function () {
   var sprite = gulp.src(src_sprites).pipe(
     spritesmith({
       imgName: "sprites.png",
       cssName: "sprites.js",
-      cssTemplate: function(data) {
+      cssTemplate: function (data) {
         var str = "var config = config || {};\n";
         str += "config.sprites = {\n";
-        data.sprites.forEach(function(sprite, i) {
+        data.sprites.forEach(function (sprite, i) {
           var name = sprite.name.toLowerCase();
           str += "  " + '"' + name + '"' + ": {\n";
           str += "    " + "size: " + sprite.width + ",\n";
@@ -50,7 +50,7 @@ gulp.task("sprites", function() {
         });
         str += "};";
         return str;
-      }
+      },
     })
   );
 
@@ -67,7 +67,7 @@ gulp.task("sprites", function() {
   return merge(img_stream, css_stream).pipe(
     notify({
       title: "Image Sprites",
-      message: "Compiled successfully"
+      message: "Compiled successfully",
     })
   );
 });
@@ -76,7 +76,7 @@ gulp.task("sprites", function() {
 	---------------------------------------- */
 
 var src_sass = src + "/sass/style.scss";
-gulp.task("sass", function() {
+gulp.task("sass", function () {
   return gulp
     .src(src_sass)
     .pipe(sass.sync().on("error", sass.logError))
@@ -87,12 +87,12 @@ gulp.task("sass", function() {
       !production
         ? notify({
             title: "SASS",
-            message: "Compiled successfully"
+            message: "Compiled successfully",
           })
         : util.noop()
     );
 });
-gulp.task("sass_watch", function() {
+gulp.task("sass_watch", function () {
   gulp.watch(src + "/sass/**/*.scss", ["sass"]);
 });
 
@@ -100,9 +100,9 @@ gulp.task("sass_watch", function() {
 	---------------------------------------- */
 
 var clientSrc = ["core", "client"].map(
-  folder => src + "/" + folder + "/**/*.js"
+  (folder) => src + "/" + folder + "/**/*.js"
 );
-gulp.task("client", function() {
+gulp.task("client", function () {
   return gulp
     .src(clientSrc)
     .pipe(production ? util.noop() : sourcemaps.init())
@@ -114,13 +114,13 @@ gulp.task("client", function() {
       !production
         ? notify({
             title: "Client JS",
-            message: "Compiled successfully"
+            message: "Compiled successfully",
           })
         : util.noop()
     );
 });
 
-gulp.task("client_watch", function() {
+gulp.task("client_watch", function () {
   gulp.watch(clientSrc, ["client"]);
 });
 
@@ -128,9 +128,9 @@ gulp.task("client_watch", function() {
     ---------------------------------------- */
 
 var serverSrc = ["core", "server"].map(
-  folder => src + "/" + folder + "/**/*.js"
+  (folder) => src + "/" + folder + "/**/*.js"
 );
-gulp.task("server", function() {
+gulp.task("server", function () {
   return gulp
     .src(serverSrc)
     .pipe(concat("server.js"))
@@ -139,12 +139,12 @@ gulp.task("server", function() {
       !production
         ? notify({
             title: "JS - Server",
-            message: "Compiled successfully"
+            message: "Compiled successfully",
           })
         : util.noop()
     );
 });
-gulp.task("server_watch", function() {
+gulp.task("server_watch", function () {
   gulp.watch(serverSrc, ["server"]);
 });
 
@@ -157,7 +157,7 @@ gulp.task("default", [
   "server",
   "server_watch",
   "client",
-  "client_watch"
+  "client_watch",
 ]);
 
 gulp.task("build", ["sass", "server", "client"]);
