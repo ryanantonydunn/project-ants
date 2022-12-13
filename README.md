@@ -17,7 +17,7 @@ Project Ants is a multiplayer action browser game with a custom physics engine. 
 
 ## Playable Demo
 
-[Single player demo available here](https://projectants.ryandunn.dev/)
+[Single player demo available here](https://ryanantonydunn.github.io/project-ants/)
 
 ## Demo Video
 
